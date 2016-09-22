@@ -46,18 +46,6 @@ class v1Unis():
 
         resp.body = json.dumps(responsedict)
 
-class v1GetSubjects():
-    """
-        Retrieves list of all subjects for a given Uni and Term
-    """
-    def on_get(self, req, resp, uni, term):
-        # The term must be a string since the threads represent them as such
-        if uni in uniThreads and term in uniThreads[uni].getTerms():
-            resp.body = json.dumps({"subjects": uniThreads[uni].getSubjectList(term)})
-        else:
-            raise falcon.HTTPBadRequest('Resource Not Found',
-                                        'The specified university or term was not found')
-
 class v1GetAllUniTermSubjects():
     """
         Retrieves all subjects and classes for a given Uni
@@ -69,30 +57,6 @@ class v1GetAllUniTermSubjects():
         else:
             raise falcon.HTTPBadRequest('Resource Not Found',
                                         'The specified university or term was not found')
-
-class v1GetAllUniTermDesc():
-    """
-        Retrieves all course descriptions for a given Uni
-    """
-    def on_get(self, req, resp, uni):
-        # The term must be a string since the threads represent them as such
-        if uni in uniThreads:
-            resp.body = json.dumps(uniThreads[uni].getCourseDescriptions())
-        else:
-            raise falcon.HTTPBadRequest('Resource Not Found',
-                                        'The specified university was not found')
-
-class v1GetAllUniSubDesc():
-    """
-        Retrieves all subject descriptions for a given Uni
-    """
-    def on_get(self, req, resp, uni):
-        # The term must be a string since the threads represent them as such
-        if uni in uniThreads:
-            resp.body = json.dumps(uniThreads[uni].getSubjectDesc())
-        else:
-            raise falcon.HTTPBadRequest('Resource Not Found',
-                                        'The specified university was not found')
 
 if __name__ == '__main__':
 
@@ -156,10 +120,7 @@ if __name__ == '__main__':
 
     # Add the routes
     app.add_route('/v1/unis', v1Unis())
-    app.add_route('/v1/unis/{uni}/{term}', v1GetSubjects())
     app.add_route('/v1/unis/{uni}/{term}/all', v1GetAllUniTermSubjects())
-    app.add_route('/v1/unis/{uni}/desc', v1GetAllUniTermDesc())
-    app.add_route('/v1/unis/{uni}/subjects', v1GetAllUniSubDesc())
 
     # It is highly recommended to put this API behind a proxy such as nginx with heavy caching
     log.info("Setting up API server on port 3000")
