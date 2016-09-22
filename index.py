@@ -65,7 +65,7 @@ class v1GetAllUniTermSubjects():
     def on_get(self, req, resp, uni, term):
         # The term must be a string since the threads represent them as such
         if uni in uniThreads and term in uniThreads[uni].getTerms():
-            resp.body = json.dumps(uniThreads[uni].getSubjectListAll(term))
+            resp.body = json.dumps(uniThreads[uni].getSubjectListAll(term), sort_keys=True)
         else:
             raise falcon.HTTPBadRequest('Resource Not Found',
                                         'The specified university or term was not found')
