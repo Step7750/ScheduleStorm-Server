@@ -92,7 +92,7 @@ class RateMyProfessors(threading.Thread):
         :return:
         """
 
-        log.info("Upserting teachers for " + schoolid + " into RMP db")
+        log.info("Upserting teachers for " + str(schoolid) + " into RMP db")
 
         for teacher in teachers:
             if "averageratingscore_rf" in teacher:
