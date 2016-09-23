@@ -14,7 +14,7 @@
         "UAlberta": {
             "fullname": "University of Alberta",
             "enabled": true,
-            "scrape": false,
+            "scrape": true,
             "userid": "",
             "pin": "",
             "scrapeinterval": 7200,

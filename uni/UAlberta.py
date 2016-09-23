@@ -10,7 +10,7 @@ import threading
 import pymongo
 import time
 import logging
-import ldap3
+from ldap3 import Server, Connection, ALL
 
 log = logging.getLogger("UAlberta")
 
@@ -77,6 +77,11 @@ class UAlberta(threading.Thread):
         if self.settings["scrape"]:
             while True:
                 try:
+                    server = Server('directory.srv.ualberta.ca', get_info=ALL)
+                    conn = Connection(server, auto_bind=True)
+                    #log.info(server.info)
+                    log.info(conn.search('ou=calendar, dc=ualberta, dc=ca', '(term=1580)'))
+                    log.info(conn.entries)
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
