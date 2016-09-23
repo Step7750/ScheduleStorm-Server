@@ -645,26 +645,6 @@ class UCalgary(threading.Thread):
 
         return response
 
-    def getSubjectList(self, term):
-        """
-        API Handler
-
-        Returns a list of all subjects for a given term
-
-        :param term: **string/int** Term id to retrieve subjects for
-        :return: **dict** Contains every subject and course for this term
-        """
-        responsedict = {}
-
-        # Get distinct subjects for this term
-        subjectlist = self.db.UCalgaryCourseList.distinct("subject", {"term": int(term)})
-
-        for subject in subjectlist:
-            # Get the courses for this subject
-            responsedict[subject] = self.db.UCalgaryCourseList.distinct("coursenum", {"term": int(term), "subject": subject})
-
-        return responsedict
-
     def retrieveCourseDesc(self, courses):
         """
         Given a course list from an API handler, retrieves course descriptions and sorts by faculty
@@ -858,49 +838,6 @@ class UCalgary(threading.Thread):
 
         # If we don't want PPrint
         #return json.dumps({"classes": responsedict, "rmp": rmpobj}, default=json_util.default)
-
-    def getCourseDescriptions(self):
-        """
-        API Handler
-
-        Returns the description of every course at UCalgary
-        :return: **dict** Description of every course at UCalgary
-        """
-        responsedict = {}
-
-        # Get the courses
-        courses = self.db.UCalgaryCourseDesc.find()
-
-        for classv in courses:
-            # Remove unnecessary fields
-            del classv["_id"]
-            del classv["lastModified"]
-
-            # If the key for this subject is not in the dict, add it
-            if classv["subject"] not in responsedict:
-                responsedict[classv["subject"]] = {}
-
-            responsedict[classv["subject"]][classv["coursenum"]] = classv
-
-        return responsedict
-
-    def getSubjectDesc(self):
-        """
-        API Handler
-
-        Returns the description of every subject at UCalgary
-
-        :return: **dict** Description of every subject at UCalgary
-        """
-        responsedict = {}
-        subjects = self.db.UCalgarySubjects.find()
-
-        for subject in subjects:
-            del subject["_id"]
-            del subject["lastModified"]
-
-            responsedict[subject["subject"]] = subject
-        return responsedict
 
     def updateFaculties(self):
         # Get the list
