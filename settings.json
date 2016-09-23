@@ -12,7 +12,13 @@
             "_comment": "UCalgary does not support multi-threading (on the same account), incorrect data will be retrieved"
         },
         "UAlberta": {
-            "enabled": false
+            "fullname": "University of Alberta",
+            "enabled": true,
+            "scrape": false,
+            "userid": "",
+            "pin": "",
+            "scrapeinterval": 7200,
+            "rmpid": 1407
         },
         "MTRoyal": {
             "fullname": "Mount Royal University",

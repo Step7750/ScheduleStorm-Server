@@ -10,7 +10,7 @@ import threading
 import pymongo
 import time
 import logging
-
+import ldap3
 
 log = logging.getLogger("UAlberta")
 
@@ -41,6 +41,7 @@ class UAlberta(threading.Thread):
         """
         API Handler
 
+        Returns a list of all locations at UAlberta
 
         :return: **list** Contains 1D with the possible locations
         """
