@@ -7,6 +7,7 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 """
 
 from . import UCalgary
+from . import MTRoyal
 
 
 

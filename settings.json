@@ -7,12 +7,22 @@
             "ucid": "",
             "scrapeinterval": 3600,
             "enabled": true,
-            "scrape": true,
+            "scrape": false,
             "rmpid": 1416,
             "_comment": "UCalgary does not support multi-threading (on the same account), incorrect data will be retrieved"
         },
         "UAlberta": {
             "enabled": false
+        },
+        "MTRoyal": {
+            "fullname": "Mount Royal University",
+            "enabled": false,
+            "scrape": false,
+            "userid": "",
+            "pin": "",
+            "_comment_login": "Use your login for this page: https://mruweb.mymru.ca/prod/bwskfreg.P_AltPin",
+            "scrapeinterval": 7200,
+            "rmpid": 1570
         }
     },
     "rmpinterval": 21600
