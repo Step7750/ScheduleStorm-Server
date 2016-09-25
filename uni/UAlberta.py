@@ -10,7 +10,7 @@ import threading
 import pymongo
 import time
 import logging
-from ldap3 import Server, Connection, ALL
+from ldap3 import Server, Connection, SUBTREE, ALL
 
 log = logging.getLogger("UAlberta")
 
@@ -79,9 +79,42 @@ class UAlberta(threading.Thread):
                 try:
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
-                    #log.info(server.info)
-                    log.info(conn.search('ou=calendar, dc=ualberta, dc=ca', '(term=1580)'))
-                    log.info(conn.entries)
+                    entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
+                                                      search_filter='(&(term=1570)(!(textbook=*))(class=*)(!(classtime=*)))',
+                                                      search_scope= SUBTREE,
+                                                      attributes=['asString', 'class', 'term', 'campus', 'classNotes',
+                                                                  'component', 'enrollStatus'],
+                                                      paged_size=400,
+                                                      generator=False)
+                    totalEntries = len(entry_list)
+                    print('Total Entries:', totalEntries)
+                    result = self.db.UAlbertaCourseList.delete_many({})
+                    for entry in entry_list:
+                        info = str(entry['attributes']['asString']).split(" ")
+                        if len(info[0]) <= 2:
+                            subject = info[0] + " " + info[1]
+                            coursenum = info[2]
+                        else:
+                            subject = info[0]
+                            coursenum = info[1]
+                        term = entry['attributes']['term'][0]
+                        if 'classNotes' in entry['attributes']:
+                            self.db.UAlbertaCourseList.insert(
+                                {"subject": subject, "term": term,
+                                 "coursenum": coursenum, "id": str(entry['attributes']['class']),
+                                 "location": str(entry['attributes']['campus']),
+                                 "notes": entry['attributes']['classNotes'],
+                                 "type": entry['attributes']['component'],
+                                 "status": entry['attributes']['enrollStatus']}
+                            )
+                        else:
+                            self.db.UAlbertaCourseList.insert(
+                                {"subject": subject, "term": term,
+                                 "coursenum": coursenum, "id": str(entry['attributes']['class']),
+                                 "location": str(entry['attributes']['campus']),
+                                 "type": entry['attributes']['component'],
+                                 "status": entry['attributes']['enrollStatus']}
+                            )
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
