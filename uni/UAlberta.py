@@ -145,21 +145,26 @@ class UAlberta(threading.Thread):
 
     def updateFaculties(self, conn):
         log.info("Getting faculty list")
-        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
-                                                       search_filter='(term=*)',
-                                                       search_scope=LEVEL,
-                                                       attributes=['term'],
-                                                       paged_size=400,
-                                                       generator=False)
-        searchBase = 'term='+str(entry_list[0]['attributes']['term'][0])+', ou=calendar, dc=ualberta, dc=ca'
+        conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)',
+                                 search_scope=LEVEL, attributes=['term'])
+        searchBase = 'term='+str(conn.entries[len(conn.entries) - 1]['term'])+', ou=calendar, dc=ualberta, dc=ca'
+        log.info("Updating faculties with search base " + searchBase)
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(term=*)',
                                                        search_scope=LEVEL,
                                                        attributes=['subject', 'subjectTitle', 'faculty'],
-                                                       paged_size=500,
+                                                       paged_size=400,
                                                        generator=False)
         for entry in entry_list:
-            print(entry['attributes'])
+            if 'subject' in entry['attributes']:
+                self.db.UAlbertaSubjects.update(
+                    {'subject': entry['attributes']['subject']},
+                    {'$set': {'subject': entry['attributes']['subject'], 'faculty': entry['attributes']['faculty'],
+                              'name': entry['attributes']['subjectTitle']}
+                    },
+                    upsert=True
+                )
+        log.info('Finished updating faculties')
     def run(self):
         """
         Scraping thread that obtains updated course info
