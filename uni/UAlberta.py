@@ -67,15 +67,17 @@ class UAlberta(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": {}, "rmp": {}}
 
-    def scrapeCourseList(self, conn):
-        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
-                                                       search_filter='(&(term=1570)(!(textbook=*))(class=*)(!(classtime=*)))',
+    def scrapeCourseList(self, conn, termid):
+        searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
+        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                       search_filter='(&(!(textbook=*))(class=*)(!(classtime=*)))',
                                                        search_scope=SUBTREE,
                                                        attributes=['asString', 'class', 'term', 'campus',
                                                                    'classNotes', 'component',
                                                                    'enrollStatus', 'course'],
                                                        paged_size=400,
                                                        generator=False)
+        log.info('parsing course data')
         for entry in entry_list:
             info = str(entry['attributes']['asString']).split(" ")
             if not info[1].isdigit():
@@ -112,13 +114,14 @@ class UAlberta(threading.Thread):
                      },
                     upsert=True
                 )
-        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
-                                                       search_filter='(&(term=1570)(!(textbook=*))(class=*)(classtime=*))',
+        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                       search_filter='(&(!(textbook=*))(class=*)(classtime=*))',
                                                        search_scope=SUBTREE,
                                                        attributes=['day', 'class', 'startTime', 'endTime',
                                                                    'location'],
                                                        paged_size=400,
                                                        generator=False)
+        log.info('Matching additional data to course list')
         for entry in entry_list:
             duration = " "
             duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0],
@@ -143,11 +146,14 @@ class UAlberta(threading.Thread):
         totalEntries = len(entry_list)
         log.info('Upserted ' + str(totalEntries) + ' course list entries')
 
+    def scrapeTerms(self, conn):
+        conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
+                    attributes=['term', 'termTitle'])
+        return conn.entries
+
     def updateFaculties(self, conn):
         log.info("Getting faculty list")
-        conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)',
-                                 search_scope=LEVEL, attributes=['term'])
-        searchBase = 'term='+str(conn.entries[len(conn.entries) - 1]['term'])+', ou=calendar, dc=ualberta, dc=ca'
+        searchBase = 'term='+str(self.scrapeTerms(conn)[len(conn.entries) - 1]['term'])+', ou=calendar, dc=ualberta, dc=ca'
         log.info("Updating faculties with search base " + searchBase)
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(term=*)',
@@ -165,6 +171,7 @@ class UAlberta(threading.Thread):
                     upsert=True
                 )
         log.info('Finished updating faculties')
+
     def run(self):
         """
         Scraping thread that obtains updated course info
@@ -178,6 +185,14 @@ class UAlberta(threading.Thread):
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
                     self.updateFaculties(conn)
+                    self.terms = []
+                    for term in self.scrapeTerms(conn):
+                        self.terms.append({'termTitle': str(term['termTitle']), 'term': str(term['term'])})
+                    for term in self.terms:
+                        if int(term['term']) >= 1566:
+                            log.info('Obtaining ' + term['termTitle'] + ' course data with id ' + term['term'])
+                            self.scrapeCourseList(conn, term['term'])
+
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
