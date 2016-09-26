@@ -15,8 +15,6 @@
             "fullname": "University of Alberta",
             "enabled": true,
             "scrape": true,
-            "userid": "",
-            "pin": "",
             "scrapeinterval": 7200,
             "rmpid": 1407
         },

@@ -10,7 +10,7 @@ import threading
 import pymongo
 import time
 import logging
-from ldap3 import Server, Connection, SUBTREE, ALL
+from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
 
 log = logging.getLogger("UAlberta")
 
@@ -67,6 +67,99 @@ class UAlberta(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": {}, "rmp": {}}
 
+    def scrapeCourseList(self, conn):
+        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
+                                                       search_filter='(&(term=1570)(!(textbook=*))(class=*)(!(classtime=*)))',
+                                                       search_scope=SUBTREE,
+                                                       attributes=['asString', 'class', 'term', 'campus',
+                                                                   'classNotes', 'component',
+                                                                   'enrollStatus', 'course'],
+                                                       paged_size=400,
+                                                       generator=False)
+        for entry in entry_list:
+            info = str(entry['attributes']['asString']).split(" ")
+            if not info[1].isdigit():
+                subject = info[0] + " " + info[1]
+                coursenum = info[2]
+            else:
+                subject = info[0]
+                coursenum = info[1]
+            term = entry['attributes']['term'][0]
+            if 'classNotes' in entry['attributes']:
+                self.db.UAlbertaCourseList.update(
+                    {'id': str(entry['attributes']['class'])},
+                    {'$set': {"subject": subject, "term": term,
+                              "coursenum": coursenum, "id": str(entry['attributes']['class']),
+                              "location": str(entry['attributes']['campus']),
+                              "notes": entry['attributes']['classNotes'],
+                              "type": entry['attributes']['component'],
+                              "status": entry['attributes']['enrollStatus'],
+                              "group": entry['attributes']['course']},
+                     '$currentDate': {'lastModified': True}
+                     },
+                    upsert=True
+                )
+            else:
+                self.db.UAlbertaCourseList.update(
+                    {'id': str(entry['attributes']['class'])},
+                    {'$set': {"subject": subject, "term": term,
+                              "coursenum": coursenum, "id": str(entry['attributes']['class']),
+                              "location": str(entry['attributes']['campus']),
+                              "type": entry['attributes']['component'],
+                              "status": entry['attributes']['enrollStatus'],
+                              "group": entry['attributes']['course']},
+                     '$currentDate': {'lastModified': True}
+                     },
+                    upsert=True
+                )
+        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
+                                                       search_filter='(&(term=1570)(!(textbook=*))(class=*)(classtime=*))',
+                                                       search_scope=SUBTREE,
+                                                       attributes=['day', 'class', 'startTime', 'endTime',
+                                                                   'location'],
+                                                       paged_size=400,
+                                                       generator=False)
+        for entry in entry_list:
+            duration = " "
+            duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0],
+                                      entry['attributes']['endTime'][0]))
+            if 'location' in entry['attributes']:
+                self.db.UAlbertaCourseList.update(
+                    {'id': str(entry['attributes']['class'])},
+                    {'$set': {'rooms': entry['attributes']['location'],
+                              'times': duration},
+                     '$currentDate': {'lastModified': True}
+                     },
+                    upsert=True
+                )
+            else:
+                self.db.UAlbertaCourseList.update(
+                    {'id': str(entry['attributes']['class'])},
+                    {'$set': {'times': duration},
+                     '$currentDate': {'lastModified': True}
+                     },
+                    upsert=True
+                )
+        totalEntries = len(entry_list)
+        log.info('Upserted ' + str(totalEntries) + ' course list entries')
+
+    def updateFaculties(self, conn):
+        log.info("Getting faculty list")
+        entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
+                                                       search_filter='(term=*)',
+                                                       search_scope=LEVEL,
+                                                       attributes=['term'],
+                                                       paged_size=400,
+                                                       generator=False)
+        searchBase = 'term='+str(entry_list[0]['attributes']['term'][0])+', ou=calendar, dc=ualberta, dc=ca'
+        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                       search_filter='(term=*)',
+                                                       search_scope=LEVEL,
+                                                       attributes=['subject', 'subjectTitle', 'faculty'],
+                                                       paged_size=500,
+                                                       generator=False)
+        for entry in entry_list:
+            print(entry['attributes'])
     def run(self):
         """
         Scraping thread that obtains updated course info
@@ -79,42 +172,7 @@ class UAlberta(threading.Thread):
                 try:
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
-                    entry_list = conn.extend.standard.paged_search(search_base='ou=calendar, dc=ualberta, dc=ca',
-                                                      search_filter='(&(term=1570)(!(textbook=*))(class=*)(!(classtime=*)))',
-                                                      search_scope= SUBTREE,
-                                                      attributes=['asString', 'class', 'term', 'campus', 'classNotes',
-                                                                  'component', 'enrollStatus'],
-                                                      paged_size=400,
-                                                      generator=False)
-                    totalEntries = len(entry_list)
-                    print('Total Entries:', totalEntries)
-                    result = self.db.UAlbertaCourseList.delete_many({})
-                    for entry in entry_list:
-                        info = str(entry['attributes']['asString']).split(" ")
-                        if len(info[0]) <= 2:
-                            subject = info[0] + " " + info[1]
-                            coursenum = info[2]
-                        else:
-                            subject = info[0]
-                            coursenum = info[1]
-                        term = entry['attributes']['term'][0]
-                        if 'classNotes' in entry['attributes']:
-                            self.db.UAlbertaCourseList.insert(
-                                {"subject": subject, "term": term,
-                                 "coursenum": coursenum, "id": str(entry['attributes']['class']),
-                                 "location": str(entry['attributes']['campus']),
-                                 "notes": entry['attributes']['classNotes'],
-                                 "type": entry['attributes']['component'],
-                                 "status": entry['attributes']['enrollStatus']}
-                            )
-                        else:
-                            self.db.UAlbertaCourseList.insert(
-                                {"subject": subject, "term": term,
-                                 "coursenum": coursenum, "id": str(entry['attributes']['class']),
-                                 "location": str(entry['attributes']['campus']),
-                                 "type": entry['attributes']['component'],
-                                 "status": entry['attributes']['enrollStatus']}
-                            )
+                    self.updateFaculties(conn)
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
