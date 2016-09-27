@@ -67,6 +67,53 @@ class UAlberta(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": {}, "rmp": {}}
 
+    def parseCourseDescription(self, req):
+        char = 1
+        while not req[char].isalpha():
+                        char += 1
+        return req[char:]
+
+    def scrapeCourseDesc(self, conn, termid):
+        log.info('obtaining course description')
+        searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
+        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                       search_filter='(course=*)',
+                                                       search_scope=LEVEL,
+                                                       attributes=['catalog', 'courseDescription', 'courseTitle',
+                                                                   'subject', 'units'],
+                                                       paged_size=400,
+                                                       generator=False)
+        for entry in entry_list:
+            courseDesc = {
+                'coursenum': entry['attributes']['catalog'],
+                'subject': entry['attributes']['subject'],
+                'name': entry['attributes']['courseTitle'],
+                'units': entry['attributes']['units']
+            }
+            if 'courseDescription' in entry['attributes']:
+                if 'Prerequisite' in entry['attributes']['courseDescription']:
+                    prereq = str(entry['attributes']['courseDescription']).split("Prerequisite", 1)[1]
+                    prereq = self.parseCourseDescription(prereq)
+                    courseDesc['prerequisites'] = prereq
+                if "Antirequisite" in entry['attributes']['courseDescription']:
+                    antireq = str(entry['attributes']['courseDescription']).split("Antirequisite", 1)[1]
+                    antireq = self.parseCourseDescription(antireq)
+                    courseDesc['antirequisite'] = antireq
+                if "Corerequisite" in entry['attributes']['courseDescription']:
+                    corereq = str(entry['attributes']['courseDescription']).split("Corerequisite", 1)[1]
+                    corereq = self.parseCourseDescription(corereq)
+                    courseDesc['corerequisites'] = corereq
+                if "Note:" in entry['attributes']['courseDescription']:
+                    note = str(entry['attributes']['courseDescription']).split("Note:", 1)[1]
+                    courseDesc['notes'] = note
+                courseDesc['desc'] = entry['attributes']['courseDescription']
+            self.db.UAlbertaCourseDesc.update(
+                {'coursenum': entry['attributes']['catalog']}, {'$set': courseDesc,
+                                                                '$currentDate': {'lastModified': True}
+                                                                },
+                upsert=True
+            )
+
     def scrapeCourseList(self, conn, termid):
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
@@ -192,7 +239,8 @@ class UAlberta(threading.Thread):
                         if int(term['term']) >= 1566:
                             log.info('Obtaining ' + term['termTitle'] + ' course data with id ' + term['term'])
                             self.scrapeCourseList(conn, term['term'])
-
+                            self.scrapeCourseDesc(conn, term['term'])
+                    log.info('Finished scraping for UALberta data')
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
