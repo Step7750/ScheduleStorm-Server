@@ -836,7 +836,7 @@ class UCalgary(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": responsedict, "rmp": rmpobj}
 
-        # If we don't want PPrint
+        # If we don't want Print
         #return json.dumps({"classes": responsedict, "rmp": rmpobj}, default=json_util.default)
 
     def updateFaculties(self):

@@ -31,10 +31,8 @@ class UAlberta(threading.Thread):
         """
         termlist = self.db.UAlbertaCourseList.distinct("term")
         responsedict = {}
-
         for term in termlist:
-            responsedict[str(term)] = self.termIDToName(term)
-
+            responsedict[str(term)] = self.db.UAlbertaTerms.distinct(str(term))[0]
         return responsedict
 
     def getLocations(self):
@@ -54,6 +52,38 @@ class UAlberta(threading.Thread):
 
         return response
 
+    def retrieveCourseDesc(self, courses):
+        """
+        Given a course list from an API handler, retrieves course descriptions and sorts by faculty
+
+        Pure Function
+
+        :param courses: **dict** List of courses from API handler
+        :return: **dict** Faculty sorted dict with course descriptions
+        """
+        facultydict = {}
+
+        # Get the descriptions for each subject
+        for subject in courses:
+            result = self.db.UAlbertaSubjects.find_one({"subject": subject})
+
+            if result:
+                del result["_id"]
+                del result["subject"]
+                del result["lastModified"]
+
+                if "faculty" not in result:
+                    result["faculty"] = "Other"
+
+                if result["faculty"] not in facultydict:
+                    facultydict[result["faculty"]] = {}
+
+                facultydict[result["faculty"]][subject] = courses[subject]
+
+                facultydict[result["faculty"]][subject]["description"] = result
+
+        return facultydict
+
     def getSubjectListAll(self, term):
         """
         API Handler
@@ -63,9 +93,48 @@ class UAlberta(threading.Thread):
         :param term: **string/int** ID of the term
         :return: **dict** All data for the term
         """
+        responsedict = {}
 
+        classes = self.db.UAlbertaCourseList.find({'term': int(term)})
+        for course in classes:
+            del course["_id"]
+
+            if course["subject"] not in responsedict:
+                responsedict[course["subject"]] = {}
+
+            if course["coursenum"] not in responsedict[course["subject"]]:
+                responsedict[course["subject"]][course["coursenum"]] = {"classes": []}
+
+            subj = course["subject"]
+            coursen = course["coursenum"]
+
+            if "description" not in responsedict[subj][coursen]:
+                result = self.db.UAlbertaCourseDesc.find_one({"coursenum": coursen, "subject": subj})
+
+                if result:
+                    # Remove unneeded fields
+                    del result["_id"]
+                    del result["subject"]
+                    del result["coursenum"]
+                    del result["lastModified"]
+
+                    responsedict[subj][coursen]["description"] = result
+                else:
+                    responsedict[subj][coursen]["description"] = False
+
+            # Remove unneeded fields
+            del course["subject"]
+            del course["coursenum"]
+            del course["lastModified"]
+
+            # Add this class to the course list
+            responsedict[subj][coursen]["classes"].append(course)
+
+        # Add the faculty sorting and course descriptions
+        responsedict = self.retrieveCourseDesc(responsedict)
+        
         # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": {}, "rmp": {}}
+        return {"classes": responsedict, "rmp": {}}
 
     def parseCourseDescription(self, req):
         char = 1
@@ -196,6 +265,13 @@ class UAlberta(threading.Thread):
     def scrapeTerms(self, conn):
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
+        for entry in conn.entries:
+            if int(str(entry['term'])) >= 1566:
+                self.db.UAlbertaTerms.update(
+                    {str(entry['term']): str(entry['termTitle'])},
+                    {'$set': {str(entry['term']): str(entry['termTitle'])}},
+                    upsert=True
+                )
         return conn.entries
 
     def updateFaculties(self, conn):
@@ -213,7 +289,8 @@ class UAlberta(threading.Thread):
                 self.db.UAlbertaSubjects.update(
                     {'subject': entry['attributes']['subject']},
                     {'$set': {'subject': entry['attributes']['subject'], 'faculty': entry['attributes']['faculty'],
-                              'name': entry['attributes']['subjectTitle']}
+                              'name': entry['attributes']['subjectTitle']},
+                     '$currentDate': {'lastModified': True}
                     },
                     upsert=True
                 )
@@ -232,15 +309,13 @@ class UAlberta(threading.Thread):
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
                     self.updateFaculties(conn)
-                    self.terms = []
-                    for term in self.scrapeTerms(conn):
-                        self.terms.append({'termTitle': str(term['termTitle']), 'term': str(term['term'])})
+                    self.terms = self.getTerms()
                     for term in self.terms:
-                        if int(term['term']) >= 1566:
-                            log.info('Obtaining ' + term['termTitle'] + ' course data with id ' + term['term'])
-                            self.scrapeCourseList(conn, term['term'])
-                            self.scrapeCourseDesc(conn, term['term'])
-                    log.info('Finished scraping for UALberta data')
+                        if int(term) >= 1566:
+                            log.info('Obtaining ' + self.terms[term] + ' course data with id ' + term)
+                            self.scrapeCourseList(conn, term)
+                            self.scrapeCourseDesc(conn, term)
+                    log.info('Finished scraping for UAlberta data')
                     pass
                 except Exception as e:
                     log.critical("There was an critical exception | " + str(e))
@@ -249,3 +324,4 @@ class UAlberta(threading.Thread):
                 time.sleep(self.settings["scrapeinterval"])
         else:
             log.info("Scraping is disabled")
+            self.getSubjectListAll('1570')
