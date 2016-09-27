@@ -7,7 +7,9 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 """
 
 import threading
+import requests
 import pymongo
+from bs4 import BeautifulSoup
 import time
 import logging
 from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
@@ -132,7 +134,7 @@ class UAlberta(threading.Thread):
 
         # Add the faculty sorting and course descriptions
         responsedict = self.retrieveCourseDesc(responsedict)
-        
+
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": responsedict, "rmp": {}}
 
@@ -183,18 +185,27 @@ class UAlberta(threading.Thread):
                 upsert=True
             )
 
+    def UidToName(self, uid):
+        r = requests.session().post("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + str(uid), verify=False)
+        if r.status_code == requests.codes.ok:
+            soup = BeautifulSoup(r.text, 'lxml')
+            teacher = ''
+            soup._find_one("b")
+        print(r)
+
     def scrapeCourseList(self, conn, termid):
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(&(!(textbook=*))(class=*)(!(classtime=*)))',
                                                        search_scope=SUBTREE,
                                                        attributes=['asString', 'class', 'term', 'campus',
-                                                                   'classNotes', 'component',
-                                                                   'enrollStatus', 'course'],
+                                                                   'classNotes', 'component', 'enrollStatus',
+                                                                   'course', 'instructorUid'],
                                                        paged_size=400,
                                                        generator=False)
         log.info('parsing course data')
         for entry in entry_list:
+            self.UidToName(entry['attributes']['instructorUid'])
             info = str(entry['attributes']['asString']).split(" ")
             if not info[1].isdigit():
                 subject = info[0] + " " + info[1]
@@ -308,13 +319,13 @@ class UAlberta(threading.Thread):
                 try:
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
-                    self.updateFaculties(conn)
+                    #self.updateFaculties(conn)
                     self.terms = self.getTerms()
                     for term in self.terms:
                         if int(term) >= 1566:
                             log.info('Obtaining ' + self.terms[term] + ' course data with id ' + term)
                             self.scrapeCourseList(conn, term)
-                            self.scrapeCourseDesc(conn, term)
+                            #self.scrapeCourseDesc(conn, term)
                     log.info('Finished scraping for UAlberta data')
                     pass
                 except Exception as e:
@@ -324,4 +335,3 @@ class UAlberta(threading.Thread):
                 time.sleep(self.settings["scrapeinterval"])
         else:
             log.info("Scraping is disabled")
-            self.getSubjectListAll('1570')
