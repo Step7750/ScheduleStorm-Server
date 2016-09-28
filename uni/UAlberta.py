@@ -191,14 +191,12 @@ class UAlberta(threading.Thread):
             r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + uid, verify=False)
             if r.status_code == requests.codes.ok:
                 soup = BeautifulSoup(r.text, "lxml")
-                info = []
                 for tag in soup.find_all("b"):
-                    info.append(tag.text)
-                if info[0] == "Dr " or info[0] == "Prof ":
-                    professor = info[1]
-                else:
-                    professor = info[0]
-                log.info('adding uid' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
+                    info = tag.text
+                    if info != "Dr " or info != "Prof ":
+                        professor = info
+                        break
+                log.info('adding uid ' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
                 self.db.UAlbertaProfessor.update({uid: professor}, {'$set': {uid: professor}}, upsert=True)
         else:
             professor = professor[0][uid]
