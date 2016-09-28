@@ -188,13 +188,17 @@ class UAlberta(threading.Thread):
     def UidToName(self, uid):
         professor = self.db.UAlbertaProfessor.find({uid: {'$exists': True}})
         if professor.count() == 0:
-            log.info('Matching uid ' + uid + ' to new professor')
             r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + uid, verify=False)
             if r.status_code == requests.codes.ok:
                 soup = BeautifulSoup(r.text, "lxml")
-                professor = ""
+                info = []
                 for tag in soup.find_all("b"):
-                    professor += tag.text
+                    info.append(tag.text)
+                if info[0] == "Dr " or info[0] == "Prof ":
+                    professor = info[1]
+                else:
+                    professor = info[0]
+                log.info('adding uid' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
                 self.db.UAlbertaProfessor.update({uid: professor}, {'$set': {uid: professor}}, upsert=True)
         else:
             professor = professor[0][uid]
