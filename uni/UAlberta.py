@@ -98,6 +98,9 @@ class UAlberta(threading.Thread):
         responsedict = {}
 
         classes = self.db.UAlbertaCourseList.find({'term': int(term)})
+
+        distinctProfessors = []
+
         for course in classes:
             del course["_id"]
 
@@ -132,11 +135,95 @@ class UAlberta(threading.Thread):
             # Add this class to the course list
             responsedict[subj][coursen]["classes"].append(course)
 
+            for professor in course['teachers']:
+                if professor not in distinctProfessors:
+                    distinctProfessors.append(professor)
+
         # Add the faculty sorting and course descriptions
         responsedict = self.retrieveCourseDesc(responsedict)
 
+        # Match RMP data
+        rmpobj = self.matchRMPNames(distinctProfessors)
+
         # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": responsedict, "rmp": {}}
+        return {"classes": responsedict, "rmp": rmpobj}
+
+    def matchRMPNames(self, distinctProfessors):
+        """
+        Given a list of professors to match RMP data to, this function obtains all RMP data and tries to match the names
+        with the distinctProfessors list and returns the matches
+
+        We first check whether the constructed name is simply the same in RMP
+        If not, we check whether the first and last words in a name in RMP is the same
+        If not, we check whether any first and last words in the professors name has a result in RMP that starts
+            with the first and last words
+        If not, we give up and don't process the words
+
+        Most professors should have a valid match using this method, many simply don't have a profile on RMP
+        Around 80%+ of valid professors on RMP should get a match
+
+        False positives are possible, but highly unlikely given that it requires the first and last name of the
+        wrong person to start the same way
+
+        :param distinctProfessors: **list** Distinct list of all professors to find an RMP match for
+        :return: **dict** Matched professors and their RMP ratings
+        """
+        # Get the RMP data for all professors at UAlberta
+        rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
+
+        returnobj = {}
+
+        # We want to construct the names of each professor and invert the results for easier parsing
+        # and better time complexity
+        rmpinverted = {}
+
+        for professor in rmp:
+            # Construct the name
+            fullname = ""
+            if "firstname" in professor:
+                fullname += professor["firstname"]
+            if "middlename" in professor:
+                fullname += " " + professor["middlename"]
+            if "lastname" in professor:
+                fullname += " " + professor["lastname"]
+
+            # remove unnecessary fields
+            del professor["_id"]
+            del professor["lastModified"]
+            del professor["school"]
+
+            rmpinverted[fullname] = professor
+
+        # Iterate through each distinct professors
+        for professor in distinctProfessors:
+            if professor in rmpinverted:
+                # We found an instant match, add it to the return dict
+                returnobj[professor] = rmpinverted[professor]
+            else:
+                # Find the first and last words of the name
+                professorNameSplit = professor.split(" ")
+                lastword = professorNameSplit[-1]
+                firstword = professorNameSplit[0]
+
+                # Check to see if the first and last words find a match (without a middle name)
+                namewithoutmiddle = firstword + " " + lastword
+
+                if namewithoutmiddle in rmpinverted:
+                    # Found the match! Add an alias field
+                    returnobj[professor] = rmpinverted[namewithoutmiddle]
+                else:
+                    # Find a professor in RMP that had the first and last words of their name starting the
+                    # respective words in the original professor's name
+                    for professor2 in rmpinverted:
+                        splitname = professor2.split(" ")
+                        first = splitname[0]
+                        last = splitname[-1]
+
+                        if lastword.startswith(last) and firstword.startswith(first):
+                            returnobj[professor] = rmpinverted[professor2]
+                            break
+
+        return returnobj
 
     def parseCourseDescription(self, req):
         char = 1
@@ -193,7 +280,7 @@ class UAlberta(threading.Thread):
                 soup = BeautifulSoup(r.text, "lxml")
                 for tag in soup.find_all("b"):
                     info = tag.text
-                    if info != "Dr " or info != "Prof ":
+                    if info != "Dr " and info != "Prof ":
                         professor = info
                         break
                 log.info('adding uid ' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
