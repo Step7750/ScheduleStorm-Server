@@ -232,7 +232,7 @@ class UAlberta(threading.Thread):
         return req[char:]
 
     def scrapeCourseDesc(self, conn, termid):
-        log.info('obtaining course description')
+        log.info('obtaining course descriptions')
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(course=*)',
@@ -389,13 +389,13 @@ class UAlberta(threading.Thread):
                 try:
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
-                    #self.updateFaculties(conn)
+                    self.updateFaculties(conn)
                     self.terms = self.getTerms()
                     for term in self.terms:
                         if int(term) >= 1566:
                             log.info('Obtaining ' + self.terms[term] + ' course data with id ' + term)
                             self.scrapeCourseList(conn, term)
-                            #self.scrapeCourseDesc(conn, term)
+                            self.scrapeCourseDesc(conn, term)
                     log.info('Finished scraping for UAlberta data')
                     pass
                 except Exception as e:
