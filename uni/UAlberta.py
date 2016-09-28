@@ -186,12 +186,16 @@ class UAlberta(threading.Thread):
             )
 
     def UidToName(self, uid):
-        r = requests.session().post("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + str(uid), verify=False)
-        if r.status_code == requests.codes.ok:
-            soup = BeautifulSoup(r.text, 'lxml')
-            teacher = ''
-            soup._find_one("b")
-        print(r)
+        professor = self.db.UAlbertaProfessor.find({uid: {'$exists': True}})
+        if professor.count() == 0:
+            r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + uid, verify=False)
+            if r.status_code == requests.codes.ok:
+                soup = BeautifulSoup(r.text, "lxml")
+                professor = soup.b.string
+                self.db.UAlbertaProfessor.update({uid: professor}, {'$set': {uid: professor}}, upsert=True)
+        else:
+            professor = professor[0][uid]
+        return professor
 
     def scrapeCourseList(self, conn, termid):
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
@@ -205,7 +209,6 @@ class UAlberta(threading.Thread):
                                                        generator=False)
         log.info('parsing course data')
         for entry in entry_list:
-            self.UidToName(entry['attributes']['instructorUid'])
             info = str(entry['attributes']['asString']).split(" ")
             if not info[1].isdigit():
                 subject = info[0] + " " + info[1]
@@ -213,34 +216,19 @@ class UAlberta(threading.Thread):
             else:
                 subject = info[0]
                 coursenum = info[1]
-            term = entry['attributes']['term'][0]
+            courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
+                          "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
+                          "type": entry['attributes']['component'], "status": entry['attributes']['enrollStatus'],
+                          "group": entry['attributes']['course']}
+            if 'instructorUid' in entry['attributes']:
+                courseList['teachers'] = self.UidToName(entry['attributes']['instructorUid'][0])
             if 'classNotes' in entry['attributes']:
-                self.db.UAlbertaCourseList.update(
-                    {'id': str(entry['attributes']['class'])},
-                    {'$set': {"subject": subject, "term": term,
-                              "coursenum": coursenum, "id": str(entry['attributes']['class']),
-                              "location": str(entry['attributes']['campus']),
-                              "notes": entry['attributes']['classNotes'],
-                              "type": entry['attributes']['component'],
-                              "status": entry['attributes']['enrollStatus'],
-                              "group": entry['attributes']['course']},
-                     '$currentDate': {'lastModified': True}
-                     },
-                    upsert=True
-                )
-            else:
-                self.db.UAlbertaCourseList.update(
-                    {'id': str(entry['attributes']['class'])},
-                    {'$set': {"subject": subject, "term": term,
-                              "coursenum": coursenum, "id": str(entry['attributes']['class']),
-                              "location": str(entry['attributes']['campus']),
-                              "type": entry['attributes']['component'],
-                              "status": entry['attributes']['enrollStatus'],
-                              "group": entry['attributes']['course']},
-                     '$currentDate': {'lastModified': True}
-                     },
-                    upsert=True
-                )
+                courseList["notes"] = entry['attributes']['classNotes']
+            self.db.UAlbertaCourseList.update(
+                {'id': str(entry['attributes']['class'])},
+                {'$set': courseList, '$currentDate': {'lastModified': True}},
+                upsert=True
+            )
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(&(!(textbook=*))(class=*)(classtime=*))',
                                                        search_scope=SUBTREE,
@@ -253,25 +241,15 @@ class UAlberta(threading.Thread):
             duration = " "
             duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0],
                                       entry['attributes']['endTime'][0]))
+            courseList = {'times': duration}
+
             if 'location' in entry['attributes']:
-                self.db.UAlbertaCourseList.update(
-                    {'id': str(entry['attributes']['class'])},
-                    {'$set': {'rooms': entry['attributes']['location'],
-                              'times': duration},
-                     '$currentDate': {'lastModified': True}
-                     },
-                    upsert=True
-                )
-            else:
-                self.db.UAlbertaCourseList.update(
-                    {'id': str(entry['attributes']['class'])},
-                    {'$set': {'times': duration},
-                     '$currentDate': {'lastModified': True}
-                     },
-                    upsert=True
-                )
-        totalEntries = len(entry_list)
-        log.info('Upserted ' + str(totalEntries) + ' course list entries')
+                courseList['rooms'] = entry['attributes']['location']
+            self.db.UAlbertaCourseList.update(
+                {'id': str(entry['attributes']['class'])},
+                {'$set': courseList, '$currentDate': {'lastModified': True}},
+                upsert=True
+            )
 
     def scrapeTerms(self, conn):
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
