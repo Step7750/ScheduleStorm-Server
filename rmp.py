@@ -44,7 +44,7 @@ class RateMyProfessors(threading.Thread):
         log.info("Obtaining RMP data for " + str(schoolid))
 
         apiurl = "http://search.mtvnservices.com/typeahead/suggest/" \
-              "?q=*%3A*+AND+schoolid_s%3A" + str(schoolid) + \
+              "?q=schoolid_s%3A" + str(schoolid) + \
               "&defType=edismax" \
               "&qf=teacherfullname_t%5E1000+autosuggest" \
               "&sort=total_number_of_ratings_i+desc" \
@@ -52,7 +52,7 @@ class RateMyProfessors(threading.Thread):
               "&rows=999999" \
               "&start=0" \
               "&fl=pk_id+teacherfirstname_t+teacherlastname_t+total_number_of_ratings_i+averageratingscore_rf+" \
-              "teachermiddlename_t+teacherdepartment_s+averageeasyscore_rf"
+              "teachermiddlename_t+averageeasyscore_rf"
 
         obtained = False
 
@@ -80,8 +80,8 @@ class RateMyProfessors(threading.Thread):
                     return False
 
             else:
-                # We didn't get a successful response, try again in 1min
-                time.sleep(60)
+                # We didn't get a successful response
+                return False
 
     def upsertTeachers(self, teachers, schoolid):
         """
@@ -147,6 +147,8 @@ class RateMyProfessors(threading.Thread):
 
                         if rmpdata:
                             self.upsertTeachers(rmpdata, id)
+                        else:
+                            log.error("Failed to obtain RMP data for " + str(id))
                     except Exception as e:
                         log.critical("There was an error while obtaining and parsing RMP data for"
                                      + str(id) + " | " + str(e))
