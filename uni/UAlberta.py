@@ -44,6 +44,10 @@ class UAlberta(threading.Thread):
             ("uid", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.UAlbertaTerms.create_index([
+            ("term", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -55,7 +59,7 @@ class UAlberta(threading.Thread):
         termlist = self.db.UAlbertaCourseList.distinct("term")
         responsedict = {}
         for term in termlist:
-            responsedict[str(term)] = self.db.UAlbertaTerms.distinct(str(term))[0]
+            responsedict[str(term)] = self.db.UAlbertaTerms.distinct(str(term))
         return responsedict
 
     def getLocations(self):
@@ -297,7 +301,7 @@ class UAlberta(threading.Thread):
             )
 
     def UidToName(self, uid):
-        professor = self.db.UAlbertaProfessor.find({uid: {'$exists': True}})
+        professor = self.db.UAlbertaProfessor.find({"uid": uid})
         if professor.count() == 0:
             r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + uid, verify=False)
             if r.status_code == requests.codes.ok:
@@ -308,9 +312,10 @@ class UAlberta(threading.Thread):
                         professor = info
                         break
                 log.info('adding uid ' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
-                self.db.UAlbertaProfessor.update({uid: professor}, {'$set': {uid: professor}}, upsert=True)
+                self.db.UAlbertaProfessor.update({"uid": uid}, {'$set': {"uid": uid, "Name": professor}},
+                                                 upsert=True)
         else:
-            professor = professor[0][uid]
+            professor = professor[0]['uid']
         return professor
 
     def scrapeCourseList(self, conn, termid):
@@ -373,8 +378,8 @@ class UAlberta(threading.Thread):
         for entry in conn.entries:
             if int(str(entry['term'])) >= 1566:
                 self.db.UAlbertaTerms.update(
-                    {str(entry['term']): str(entry['termTitle'])},
-                    {'$set': {str(entry['term']): str(entry['termTitle'])}},
+                    {'term': str(entry['term'])},
+                    {'$set': {'term': str(entry['term']), 'termTitle': str(entry['termTitle'])}},
                     upsert=True
                 )
         return conn.entries
@@ -414,10 +419,10 @@ class UAlberta(threading.Thread):
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
                     self.updateFaculties(conn)
-                    self.terms = self.getTerms()
-                    for term in self.terms:
+                    terms = self.db.UAlbertaTerms.distinct("term")
+                    for term in terms:
                         if int(term) >= 1566:
-                            log.info('Obtaining ' + self.terms[term] + ' course data with id ' + term)
+                            log.info('Obtaining ' + self.db.UAlbertaTerms.find({"term": term})[0]['termTitle'] + ' course data with id ' + term)
                             self.scrapeCourseList(conn, term)
                             self.scrapeCourseDesc(conn, term)
                     log.info('Finished scraping for UAlberta data')
