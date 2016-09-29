@@ -59,7 +59,7 @@ class UAlberta(threading.Thread):
         termlist = self.db.UAlbertaCourseList.distinct("term")
         responsedict = {}
         for term in termlist:
-            responsedict[str(term)] = self.db.UAlbertaTerms.distinct(str(term))
+            responsedict[str(term)] = self.db.UAlbertaTerms.find_one({"term": str(term)})['termTitle']
         return responsedict
 
     def getLocations(self):
@@ -128,7 +128,6 @@ class UAlberta(threading.Thread):
 
         for course in classes:
             del course["_id"]
-
             if course["subject"] not in responsedict:
                 responsedict[course["subject"]] = {}
 
@@ -159,7 +158,6 @@ class UAlberta(threading.Thread):
 
             # Add this class to the course list
             responsedict[subj][coursen]["classes"].append(course)
-
             for professor in course['teachers']:
                 if professor not in distinctProfessors:
                     distinctProfessors.append(professor)
@@ -173,79 +171,79 @@ class UAlberta(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": responsedict, "rmp": rmpobj}
 
-    def matchRMPNames(self, distinctProfessors):
+    def matchRMPNames(self, distinctteachers):
         """
-        Given a list of professors to match RMP data to, this function obtains all RMP data and tries to match the names
-        with the distinctProfessors list and returns the matches
+        Given a list of teachers to match RMP data to, this function obtains all RMP data and tries to match the names
+        with the distinctteachers list and returns the matches
 
         We first check whether the constructed name is simply the same in RMP
         If not, we check whether the first and last words in a name in RMP is the same
-        If not, we check whether any first and last words in the professors name has a result in RMP that starts
+        If not, we check whether any first and last words in the teachers name has a result in RMP that starts
             with the first and last words
         If not, we give up and don't process the words
 
-        Most professors should have a valid match using this method, many simply don't have a profile on RMP
-        Around 80%+ of valid professors on RMP should get a match
+        Most teachers should have a valid match using this method, many simply don't have a profile on RMP
+        Around 80%+ of valid teachers on RMP should get a match
 
         False positives are possible, but highly unlikely given that it requires the first and last name of the
         wrong person to start the same way
 
-        :param distinctProfessors: **list** Distinct list of all professors to find an RMP match for
-        :return: **dict** Matched professors and their RMP ratings
+        :param distinctteachers: **list** Distinct list of all teachers to find an RMP match for
+        :return: **dict** Matched teachers and their RMP ratings
         """
-        # Get the RMP data for all professors at UAlberta
+        # Get the RMP data for all teachers at UAlberta
         rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
 
         returnobj = {}
 
-        # We want to construct the names of each professor and invert the results for easier parsing
+        # We want to construct the names of each teacher and invert the results for easier parsing
         # and better time complexity
         rmpinverted = {}
-
-        for professor in rmp:
+        for teacher in rmp:
+            print(teacher)
             # Construct the name
             fullname = ""
-            if "firstname" in professor:
-                fullname += professor["firstname"]
-            if "middlename" in professor:
-                fullname += " " + professor["middlename"]
-            if "lastname" in professor:
-                fullname += " " + professor["lastname"]
+            if "firstname" in teacher:
+                fullname += teacher["firstname"]
+            if "middlename" in teacher:
+                fullname += " " + teacher["middlename"]
+            if "lastname" in teacher:
+                fullname += " " + teacher["lastname"]
 
             # remove unnecessary fields
-            del professor["_id"]
-            del professor["lastModified"]
-            del professor["school"]
+            del teacher["_id"]
+            del teacher["lastModified"]
+            del teacher["school"]
 
-            rmpinverted[fullname] = professor
+            rmpinverted[fullname] = teacher
 
-        # Iterate through each distinct professors
-        for professor in distinctProfessors:
-            if professor in rmpinverted:
+        # Iterate through each distinct teacher
+        for teacher in distinctteachers:
+            if teacher in rmpinverted:
                 # We found an instant match, add it to the return dict
-                returnobj[professor] = rmpinverted[professor]
+                returnobj[teacher] = rmpinverted[teacher]
             else:
                 # Find the first and last words of the name
-                professorNameSplit = professor.split(" ")
-                lastword = professorNameSplit[-1]
-                firstword = professorNameSplit[0]
+                teacherNameSplit = teacher.split(" ")
+                lastword = teacherNameSplit[-1]
+                firstword = teacherNameSplit[0]
 
                 # Check to see if the first and last words find a match (without a middle name)
                 namewithoutmiddle = firstword + " " + lastword
 
                 if namewithoutmiddle in rmpinverted:
                     # Found the match! Add an alias field
-                    returnobj[professor] = rmpinverted[namewithoutmiddle]
+                    returnobj[teacher] = rmpinverted[namewithoutmiddle]
                 else:
-                    # Find a professor in RMP that had the first and last words of their name starting the
-                    # respective words in the original professor's name
-                    for professor2 in rmpinverted:
-                        splitname = professor2.split(" ")
+                    # Find a teacher in RMP that had the first and last words of their name starting the
+                    # respective words in the original teacher's name
+                    for teacher2 in rmpinverted:
+                        splitname = teacher2.split(" ")
                         first = splitname[0]
                         last = splitname[-1]
 
                         if lastword.startswith(last) and firstword.startswith(first):
-                            returnobj[professor] = rmpinverted[professor2]
+                            returnobj[teacher] = rmpinverted[teacher2]
                             break
 
         return returnobj
@@ -273,6 +271,7 @@ class UAlberta(threading.Thread):
                 'name': entry['attributes']['courseTitle'],
                 'units': entry['attributes']['units']
             }
+
             if 'courseDescription' in entry['attributes']:
                 if 'Prerequisite' in entry['attributes']['courseDescription']:
                     prereq = str(entry['attributes']['courseDescription']).split("Prerequisite", 1)[1]
@@ -342,7 +341,9 @@ class UAlberta(threading.Thread):
                           "type": entry['attributes']['component'], "status": entry['attributes']['enrollStatus'],
                           "group": entry['attributes']['course']}
             if 'instructorUid' in entry['attributes']:
-                courseList['teachers'] = self.UidToName(entry['attributes']['instructorUid'][0])
+                courseList['teachers'] = [self.UidToName(entry['attributes']['instructorUid'][0])]
+            else:
+                courseList['teachers'] = ["N/A"]
             if 'classNotes' in entry['attributes']:
                 courseList["notes"] = entry['attributes']['classNotes']
             self.db.UAlbertaCourseList.update(
@@ -375,35 +376,42 @@ class UAlberta(threading.Thread):
     def scrapeTerms(self, conn):
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
+        terms = []
         for entry in conn.entries:
+            termDict = {}
             if int(str(entry['term'])) >= 1566:
+                termDict['term'] = str(entry['term'])
+                termDict['termTitle'] = str(entry['termTitle'])
                 self.db.UAlbertaTerms.update(
                     {'term': str(entry['term'])},
-                    {'$set': {'term': str(entry['term']), 'termTitle': str(entry['termTitle'])}},
+                    {'$set': termDict},
                     upsert=True
                 )
-        return conn.entries
+                terms.append(termDict)
+        return terms
 
     def updateFaculties(self, conn):
         log.info("Getting faculty list")
-        searchBase = 'term='+str(self.scrapeTerms(conn)[len(conn.entries) - 1]['term'])+', ou=calendar, dc=ualberta, dc=ca'
-        log.info("Updating faculties with search base " + searchBase)
-        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
-                                                       search_filter='(term=*)',
-                                                       search_scope=LEVEL,
-                                                       attributes=['subject', 'subjectTitle', 'faculty'],
-                                                       paged_size=400,
-                                                       generator=False)
-        for entry in entry_list:
-            if 'subject' in entry['attributes']:
-                self.db.UAlbertaSubjects.update(
-                    {'subject': entry['attributes']['subject']},
-                    {'$set': {'subject': entry['attributes']['subject'], 'faculty': entry['attributes']['faculty'],
-                              'name': entry['attributes']['subjectTitle']},
-                     '$currentDate': {'lastModified': True}
-                    },
-                    upsert=True
-                )
+        for term in self.scrapeTerms(conn):
+            if int(term['term']) % 3 == 0 or int(term['term']) % 10 == 0:
+                searchBase = 'term='+term['term']+', ou=calendar, dc=ualberta, dc=ca'
+                log.info("Updating faculties with search base " + searchBase)
+                entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                               search_filter='(term=*)',
+                                                               search_scope=LEVEL,
+                                                               attributes=['subject', 'subjectTitle', 'faculty'],
+                                                               paged_size=400,
+                                                               generator=False)
+                for entry in entry_list:
+                    if 'subject' in entry['attributes']:
+                        self.db.UAlbertaSubjects.update(
+                            {'subject': entry['attributes']['subject']},
+                            {'$set': {'subject': entry['attributes']['subject'], 'faculty': entry['attributes']['faculty'],
+                                      'name': entry['attributes']['subjectTitle']},
+                             '$currentDate': {'lastModified': True}
+                            },
+                            upsert=True
+                        )
         log.info('Finished updating faculties')
 
     def run(self):
