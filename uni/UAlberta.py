@@ -23,6 +23,27 @@ class UAlberta(threading.Thread):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
+        log.info("Ensuring MongoDB indexes exist")
+
+        # want to add indexes (if they already exist, nothing will happen)
+        self.db.UAlbertaCourseDesc.create_index([
+            ("coursenum", pymongo.ASCENDING),
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UAlbertaCourseList.create_index([
+            ("id", pymongo.ASCENDING),
+            ("term", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UAlbertaSubjects.create_index([
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UAlbertaProfessor.create_index([
+            ("uid", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -265,10 +286,13 @@ class UAlberta(threading.Thread):
                     note = str(entry['attributes']['courseDescription']).split("Note:", 1)[1]
                     courseDesc['notes'] = note
                 courseDesc['desc'] = entry['attributes']['courseDescription']
+
             self.db.UAlbertaCourseDesc.update(
-                {'coursenum': entry['attributes']['catalog']}, {'$set': courseDesc,
-                                                                '$currentDate': {'lastModified': True}
-                                                                },
+                {'coursenum': entry['attributes']['catalog']},
+                {
+                    '$set': courseDesc,
+                    '$currentDate': {'lastModified': True}
+                },
                 upsert=True
             )
 
