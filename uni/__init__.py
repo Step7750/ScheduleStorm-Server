@@ -6,7 +6,7 @@ Under MIT License - https://github.com/Step7750/ScheduleStorm/blob/master/LICENS
 This file is a resource for Schedule Storm - https://github.com/Step7750/ScheduleStorm
 """
 
-from ScheduleStorm_Server.uni import UCalgary, MTRoyal, UAlberta
+from . import UCalgary
 from . import MTRoyal
 from . import UAlberta
 
