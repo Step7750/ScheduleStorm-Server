@@ -231,6 +231,29 @@ class UCalgary(threading.Thread):
 
         self.db = pymongo.MongoClient().ScheduleStorm
 
+        log.info("Ensuring MongoDB indexes exist")
+        
+        # want to add indexes (if they already exist, nothing will happen)
+        self.db.UCalgaryCourseList.create_index([
+            ("id", pymongo.ASCENDING),
+            ("term", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UCalgaryCourseDesc.create_index([
+            ("coursenum", pymongo.ASCENDING),
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UCalgarySubjects.create_index([
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.UCalgaryCourseDesc.create_index([
+            ("coursenum", pymongo.ASCENDING),
+            ("subject", pymongo.ASCENDING),
+            ("units", pymongo.ASCENDING)],
+            unique=True)
+
     def login(self):
         """
         Logs into MyUofC given the account specified in settings
