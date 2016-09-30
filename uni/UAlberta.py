@@ -159,7 +159,6 @@ class UAlberta(threading.Thread):
             # Add this class to the course list
             responsedict[subj][coursen]["classes"].append(course)
             for professor in course['teachers']:
-                print(professor)
                 if professor not in distinctProfessors:
                     distinctProfessors.append(professor)
 
