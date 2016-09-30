@@ -12,6 +12,7 @@ import pymongo
 from bs4 import BeautifulSoup
 import time
 import logging
+import re
 from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
 
 log = logging.getLogger("UAlberta")
@@ -267,24 +268,48 @@ class UAlberta(threading.Thread):
                 'name': entry['attributes']['courseTitle'],
                 'units': entry['attributes']['units']
             }
-
             if 'courseDescription' in entry['attributes']:
-                if 'Prerequisite' in entry['attributes']['courseDescription']:
-                    prereq = str(entry['attributes']['courseDescription']).split("Prerequisite", 1)[1]
-                    prereq = self.parseCourseDescription(prereq)
-                    courseDesc['prerequisites'] = prereq
-                if "Antirequisite" in entry['attributes']['courseDescription']:
-                    antireq = str(entry['attributes']['courseDescription']).split("Antirequisite", 1)[1]
+                desc = entry['attributes']['courseDescription']
+                print("desc:", desc)
+                if "See Note" in desc:
+                    desc = desc.split("See Note", 1)[0]
+                if 'Prerequisite' in desc:
+                    info = desc.split("Prerequisite", 1)
+                    prereq = self.parseCourseDescription(info[1])
+                    desc = info[0]
+                    if "Corequisite" in prereq or "corequisite" in prereq:
+                        if "Corequisite" in prereq:
+                            info = prereq.split("Corequisite", 1)
+                        elif "corequisite" in prereq:
+                            info = prereq.split("corequisite", 1)
+
+                        prereq = info[0]
+                        if prereq[-4:] == "and ":
+                            prereq = prereq[:-4]
+                        if len(info[1]) != 1:
+                            corereq = self.parseCourseDescription(info[1])
+                            if prereq == "or ":
+                                prereq = corereq
+                            else:
+                                courseDesc['coreq'] = corereq
+                            print("core:", corereq)
+
+                    if "Note:" in prereq:
+                        note = prereq.split("Note:", 1)
+                        courseDesc['notes'] = note[1]
+                        prereq = note[0]
+
+                    print("pre:", prereq)
+                    courseDesc['prereq'] = prereq
+                if "Antirequisite" in desc:
+                    antireq = desc.split("Antirequisite", 1)[1]
                     antireq = self.parseCourseDescription(antireq)
-                    courseDesc['antirequisite'] = antireq
-                if "Corerequisite" in entry['attributes']['courseDescription']:
-                    corereq = str(entry['attributes']['courseDescription']).split("Corerequisite", 1)[1]
-                    corereq = self.parseCourseDescription(corereq)
-                    courseDesc['corerequisites'] = corereq
-                if "Note:" in entry['attributes']['courseDescription']:
-                    note = str(entry['attributes']['courseDescription']).split("Note:", 1)[1]
-                    courseDesc['notes'] = note
-                courseDesc['desc'] = entry['attributes']['courseDescription']
+                    courseDesc['antireq'] = antireq
+                    desc = antireq[0]
+                if desc[-4:] == "and ":
+                            desc = desc[:-4]
+                #print("desc:", desc)
+                courseDesc['desc'] = desc
 
             self.db.UAlbertaCourseDesc.update(
                 {'coursenum': entry['attributes']['catalog'], 'subject': entry['attributes']['subject']},
@@ -365,6 +390,8 @@ class UAlberta(threading.Thread):
             duration = " "
             duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0].replace(" ", ""),
                                       entry['attributes']['endTime'][0].replace(" ", "")))
+
+            duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
             courseList = {'times': [duration]}
 
             if 'location' in entry['attributes']:
