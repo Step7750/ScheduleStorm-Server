@@ -159,6 +159,7 @@ class UAlberta(threading.Thread):
             # Add this class to the course list
             responsedict[subj][coursen]["classes"].append(course)
             for professor in course['teachers']:
+                print(professor)
                 if professor not in distinctProfessors:
                     distinctProfessors.append(professor)
 
@@ -167,7 +168,6 @@ class UAlberta(threading.Thread):
 
         # Match RMP data
         rmpobj = self.matchRMPNames(distinctProfessors)
-
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": responsedict, "rmp": rmpobj}
 
@@ -195,12 +195,10 @@ class UAlberta(threading.Thread):
         rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
 
         returnobj = {}
-
         # We want to construct the names of each teacher and invert the results for easier parsing
         # and better time complexity
         rmpinverted = {}
         for teacher in rmp:
-            print(teacher)
             # Construct the name
             fullname = ""
             if "firstname" in teacher:
@@ -314,7 +312,7 @@ class UAlberta(threading.Thread):
                 self.db.UAlbertaProfessor.update({"uid": uid}, {'$set': {"uid": uid, "Name": professor}},
                                                  upsert=True)
         else:
-            professor = professor[0]['uid']
+            professor = professor[0]['Name']
         return professor
 
     def scrapeCourseList(self, conn, termid):

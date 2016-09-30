@@ -14,7 +14,7 @@
         "UAlberta": {
             "fullname": "University of Alberta",
             "enabled": true,
-            "scrape": false,
+            "scrape": true,
             "scrapeinterval": 7200,
             "rmpid": 1407
         },
