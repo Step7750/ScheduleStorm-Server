@@ -407,7 +407,7 @@ class UAlberta(threading.Thread):
             termDict = {}
             if int(str(entry['term'])) >= 1566:
                 termDict['term'] = str(entry['term'])
-                termDict['termTitle'] = str(entry['termTitle'])
+                termDict['termTitle'] = str(entry['termTitle']).replace("Term ", "")
                 self.db.UAlbertaTerms.update(
                     {'term': str(entry['term'])},
                     {'$set': termDict},
