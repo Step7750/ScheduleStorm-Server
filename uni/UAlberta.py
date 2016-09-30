@@ -139,7 +139,6 @@ class UAlberta(threading.Thread):
 
             if "description" not in responsedict[subj][coursen]:
                 result = self.db.UAlbertaCourseDesc.find_one({"coursenum": coursen, "subject": subj})
-
                 if result:
                     # Remove unneeded fields
                     del result["_id"]
@@ -288,7 +287,7 @@ class UAlberta(threading.Thread):
                 courseDesc['desc'] = entry['attributes']['courseDescription']
 
             self.db.UAlbertaCourseDesc.update(
-                {'coursenum': entry['attributes']['catalog']},
+                {'coursenum': entry['attributes']['catalog'], 'subject': entry['attributes']['subject']},
                 {
                     '$set': courseDesc,
                     '$currentDate': {'lastModified': True}
