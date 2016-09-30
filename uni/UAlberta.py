@@ -363,7 +363,7 @@ class UAlberta(threading.Thread):
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
                           "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
                           "type": entry['attributes']['component'], "status": status,
-                          "group": entry['attributes']['course']}
+                          "group": entry['attributes']['course'], "times": ["N/A"], "rooms": ["N/A"]}
             if 'instructorUid' in entry['attributes']:
                 courseList['teachers'] = [self.UidToName(entry['attributes']['instructorUid'][0])]
             else:
