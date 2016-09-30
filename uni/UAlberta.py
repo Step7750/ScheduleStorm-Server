@@ -270,7 +270,6 @@ class UAlberta(threading.Thread):
             }
             if 'courseDescription' in entry['attributes']:
                 desc = entry['attributes']['courseDescription']
-                print("desc:", desc)
                 if "See Note" in desc:
                     desc = desc.split("See Note", 1)[0]
                 if 'Prerequisite' in desc:
@@ -291,15 +290,14 @@ class UAlberta(threading.Thread):
                             if prereq == "or ":
                                 prereq = corereq
                             else:
-                                courseDesc['coreq'] = corereq
-                            print("core:", corereq)
+                                if corereq != prereq:
+                                    courseDesc['coreq'] = corereq
 
                     if "Note:" in prereq:
                         note = prereq.split("Note:", 1)
                         courseDesc['notes'] = note[1]
                         prereq = note[0]
 
-                    print("pre:", prereq)
                     courseDesc['prereq'] = prereq
                 if "Antirequisite" in desc:
                     antireq = desc.split("Antirequisite", 1)[1]
@@ -308,7 +306,6 @@ class UAlberta(threading.Thread):
                     desc = antireq[0]
                 if desc[-4:] == "and ":
                             desc = desc[:-4]
-                #print("desc:", desc)
                 courseDesc['desc'] = desc
 
             self.db.UAlbertaCourseDesc.update(
