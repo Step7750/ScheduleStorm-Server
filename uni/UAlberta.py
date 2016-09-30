@@ -333,16 +333,22 @@ class UAlberta(threading.Thread):
             else:
                 subject = info[0]
                 coursenum = info[1]
+            if entry['attributes']['enrollStatus'] == "O":
+                status = "Open"
+            elif entry['attributes']['enrollStatus'] == "C":
+                status = "Closed"
+            else:
+                status = entry['attributes']['enrollStatus']
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
                           "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
-                          "type": entry['attributes']['component'], "status": entry['attributes']['enrollStatus'],
+                          "type": entry['attributes']['component'], "status": status,
                           "group": entry['attributes']['course']}
             if 'instructorUid' in entry['attributes']:
                 courseList['teachers'] = [self.UidToName(entry['attributes']['instructorUid'][0])]
             else:
                 courseList['teachers'] = ["N/A"]
             if 'classNotes' in entry['attributes']:
-                courseList["notes"] = entry['attributes']['classNotes']
+                courseList["notes"] = entry['attributes']['classNotes'][0]
             self.db.UAlbertaCourseList.update(
                 {'id': str(entry['attributes']['class'])},
                 {'$set': courseList, '$currentDate': {'lastModified': True}},
@@ -358,12 +364,12 @@ class UAlberta(threading.Thread):
         log.info('Matching additional data to course list')
         for entry in entry_list:
             duration = " "
-            duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0],
-                                      entry['attributes']['endTime'][0]))
-            courseList = {'times': duration}
+            duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0].replace(" ", ""),
+                                      entry['attributes']['endTime'][0].replace(" ", "")))
+            courseList = {'times': [duration]}
 
             if 'location' in entry['attributes']:
-                courseList['rooms'] = entry['attributes']['location']
+                courseList['rooms'] = [entry['attributes']['location']]
             self.db.UAlbertaCourseList.update(
                 {'id': str(entry['attributes']['class'])},
                 {'$set': courseList, '$currentDate': {'lastModified': True}},
