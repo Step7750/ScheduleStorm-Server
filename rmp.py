@@ -33,6 +33,17 @@ class RateMyProfessors(threading.Thread):
         # Establish db connection
         self.db = pymongo.MongoClient().ScheduleStorm
 
+        log.info("Ensuring MongoDB indexes exist")
+        self.db.RateMyProfessors.create_index(
+            [("school", pymongo.ASCENDING)]
+        )
+
+        self.db.RateMyProfessors.create_index(
+            [("id", pymongo.ASCENDING),
+             ("school", pymongo.ASCENDING)],
+            unique=True
+        )
+
     def getRatingsForSchool(self, schoolid):
         """
         Returns the JSON for teacher ratings for the specified school id
