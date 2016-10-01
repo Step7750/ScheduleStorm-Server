@@ -14,9 +14,9 @@ import time
 import logging
 import re
 from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
+from queue import Queue
 
 log = logging.getLogger("UAlberta")
-
 
 class UAlberta(threading.Thread):
     def __init__(self, settings):
@@ -318,20 +318,18 @@ class UAlberta(threading.Thread):
             )
 
     def UidToName(self, uid):
+        """
+        Returns the name of the prof with the specified UID
+
+        :param uid: **string** UID of the given prof
+        :return: **string** Name of the prof if successful, UID if not
+        """
         professor = self.db.UAlbertaProfessor.find({"uid": uid})
         if professor.count() == 0:
-            r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + uid, verify=False)
-            if r.status_code == requests.codes.ok:
-                soup = BeautifulSoup(r.text, "lxml")
-                for tag in soup.find_all("b"):
-                    info = tag.text
-                    if info != "Dr " and info != "Prof ":
-                        professor = info
-                        break
-                log.info('adding uid ' + uid + ' to UAlbertaProfessor db with professor name ' + professor)
-                self.db.UAlbertaProfessor.update({"uid": uid}, {'$set': {"uid": uid, "Name": professor}},
-                                                 upsert=True)
+            # There must have been an issue when obtaining the data, just use the UID temporarily
+            return uid
         else:
+            # We got the name, return it
             professor = professor[0]['Name']
         return professor
 
@@ -345,7 +343,36 @@ class UAlberta(threading.Thread):
                                                                    'course', 'instructorUid'],
                                                        paged_size=400,
                                                        generator=False)
-        log.info('parsing course data')
+
+        # We want to scrape professor names from their UID's
+        q = Queue()
+
+        log.info("Filling up the Queue with Prof UIDs")
+
+        # Fill queue with unique prof names
+        queuedProfs = {}
+
+        for entry in entry_list:
+            # Ensure this class has teachers
+            if 'instructorUid' in entry['attributes']:
+
+                # We don't want to request duplicates
+                if entry['attributes']['instructorUid'][0] not in queuedProfs:
+                    q.put(entry['attributes']['instructorUid'][0])
+
+                    # Add to the queuedProfs to avoid dupes
+                    queuedProfs[entry['attributes']['instructorUid'][0]] = True
+
+        # Start up the threads
+        for i in range(self.settings["uidConcurrency"]):
+            concurrentScraper = UIDScraper(q, self.db)
+            concurrentScraper.daemon = True
+            concurrentScraper.start()
+
+        # Wait until the threads are done
+        q.join()
+
+        log.info('Parsing course data')
         for entry in entry_list:
             info = str(entry['attributes']['asString']).split(" ")
             if not info[1].isdigit():
@@ -468,3 +495,61 @@ class UAlberta(threading.Thread):
                 time.sleep(self.settings["scrapeinterval"])
         else:
             log.info("Scraping is disabled")
+
+
+class UIDScraper(threading.Thread):
+    """
+    Thread that gets UID's from the passed in queue and inserts the prof's data from UAlberta
+    """
+
+    def __init__(self, q, db):
+        threading.Thread.__init__(self)
+        self.q = q
+        self.db = db
+
+    def run(self):
+        """
+        Scraping thread that gets a UID and inserts the returned prof data into the DB
+
+        :return:
+        """
+        while not self.q.empty():
+            # Get this UID from the queue
+            thisuid = self.q.get()
+
+            if thisuid:
+                # Check if its already in the DB
+                uidExists = self.db.UAlbertaProfessor.find({"uid": thisuid})
+
+                if uidExists.count() == 0:
+                    try:
+                        # Get the prof data from the UAlberta directory
+                        r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + thisuid,
+                                        timeout=20)
+
+                        # Check if the HTTP status code is ok
+                        if r.status_code == requests.codes.ok:
+                            # Parse the HTML
+                            soup = BeautifulSoup(r.text, "lxml")
+                            for tag in soup.find_all("b"):
+                                info = tag.text
+                                if info != "Dr " and info != "Prof ":
+                                    professor = info
+                                    break
+
+                            log.info('Adding UID ' + thisuid + ' to UAlbertaProfessor db, Name: ' + professor)
+
+                            # Upsert the data
+                            self.db.UAlbertaProfessor.update({"uid": thisuid},
+                                                             {'$set': {"uid": thisuid, "Name": professor}},
+                                                             upsert=True)
+                        else:
+                            log.error("Improper HTTP Status for UID " + thisuid)
+                    except:
+                        log.error("Failed to obtain name for " + thisuid)
+
+                # We're done with this class
+                self.q.task_done()
+            else:
+                # No more items in the queue, stop the loop
+                break

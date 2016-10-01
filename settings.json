@@ -16,6 +16,8 @@
             "enabled": true,
             "scrape": true,
             "scrapeinterval": 7200,
+            "uidConcurrency": 10,
+            "uidConcurrency_comment": "Max amount of concurrent requests to fetch UID Professor Names",
             "rmpid": 1407
         },
         "MTRoyal": {
