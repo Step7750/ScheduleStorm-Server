@@ -246,12 +246,27 @@ class UAlberta(threading.Thread):
         return returnobj
 
     def parseCourseDescription(self, req):
+        """
+        Removes unnessary non-letters from the req
+
+        :param req: **string** requisite form the description of a course
+        :return: **string**
+        """
         char = 1
         while not req[char].isalpha():
                         char += 1
         return req[char:]
 
     def scrapeCourseDesc(self, conn, termid):
+        """
+        Retrieves all course descriptions then parses the course requisites and notes then upserts for every entry in
+        the query results
+
+        :param conn: **ldap connection object**
+        :param termid: **string/int** Term ID to get courses for
+        :return: **string**
+        """
+
         log.info('obtaining course descriptions')
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
@@ -334,6 +349,14 @@ class UAlberta(threading.Thread):
         return professor
 
     def scrapeCourseList(self, conn, termid):
+        """
+        Queries the course list with the termid, matches the professor to the course, upserts the initial dictionary
+        then matches additional data to the object
+
+        :param conn: **ldap connection object**
+        :param termid: **string/int** Term ID to get courses for
+        :return:
+        """
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(&(!(textbook=*))(class=*)(!(classtime=*)))',
@@ -427,6 +450,13 @@ class UAlberta(threading.Thread):
             )
 
     def scrapeTerms(self, conn):
+        """
+        Retrieves all course descriptions then parses the course requisites and notes then upserts for every entry in
+        the query results
+
+        :param conn: **ldap connection object**
+        :return: **dict** has two keys term and termTitle, values are matched to their respective keys
+        """
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
         terms = []
@@ -444,6 +474,12 @@ class UAlberta(threading.Thread):
         return terms
 
     def updateFaculties(self, conn):
+        """
+        Updates the faculties with the current terms as the search base
+
+        :param conn: **ldap connection object**
+        :return:
+        """
         log.info("Getting faculty list")
         for term in self.scrapeTerms(conn):
             if int(term['term']) % 3 == 0 or int(term['term']) % 10 == 0:
