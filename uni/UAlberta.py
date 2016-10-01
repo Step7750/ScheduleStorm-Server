@@ -127,6 +127,7 @@ class UAlberta(threading.Thread):
 
         distinctProfessors = []
 
+        # Parse each class and get their descriptions
         for course in classes:
             del course["_id"]
             if course["subject"] not in responsedict:
@@ -138,6 +139,7 @@ class UAlberta(threading.Thread):
             subj = course["subject"]
             coursen = course["coursenum"]
 
+            # Get the class description
             if "description" not in responsedict[subj][coursen]:
                 result = self.db.UAlbertaCourseDesc.find_one({"coursenum": coursen, "subject": subj})
                 if result:
@@ -268,38 +270,57 @@ class UAlberta(threading.Thread):
         """
 
         log.info('obtaining course descriptions')
+
+        # Page queries course descriptions with the search base
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
-        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
-                                                       search_filter='(course=*)',
+        entry_list = conn.extend.standard.paged_search(search_base=searchBase, search_filter='(course=*)',
                                                        search_scope=LEVEL,
                                                        attributes=['catalog', 'courseDescription', 'courseTitle',
-                                                                   'subject', 'units'],
-                                                       paged_size=400,
-                                                       generator=False)
+                                                                   'subject', 'units'], paged_size=400, generator=False)
+
+        # for entry in list, parse and upsert course descriptions
         for entry in entry_list:
+
+            # initialize course description dict
             courseDesc = {
                 'coursenum': entry['attributes']['catalog'],
                 'subject': entry['attributes']['subject'],
                 'name': entry['attributes']['courseTitle'],
                 'units': entry['attributes']['units']
             }
+
+            # Does the course have a description?
             if 'courseDescription' in entry['attributes']:
                 desc = entry['attributes']['courseDescription']
+
+                # Removes "See note (x) above" from description?
                 if "See Note" in desc:
                     desc = desc.split("See Note", 1)[0]
+
+                # Does the course have a prerequisite?
                 if 'Prerequisite' in desc:
+
+                    # Splits the prerequisite from the description
                     info = desc.split("Prerequisite", 1)
                     prereq = self.parseCourseDescription(info[1])
                     desc = info[0]
+
+                    # Does prerequisite have a corequisite inside of it
                     if "Corequisite" in prereq or "corequisite" in prereq:
+
+                        #Splits the corequisite from the prereq
                         if "Corequisite" in prereq:
                             info = prereq.split("Corequisite", 1)
                         elif "corequisite" in prereq:
                             info = prereq.split("corequisite", 1)
 
                         prereq = info[0]
+
+                        # Removes any "and " leftover from the splitting
                         if prereq[-4:] == "and ":
                             prereq = prereq[:-4]
+
+                        # if the coreq is different from the prereq
                         if len(info[1]) != 1:
                             corereq = self.parseCourseDescription(info[1])
                             if prereq == "or ":
@@ -308,21 +329,27 @@ class UAlberta(threading.Thread):
                                 if corereq != prereq:
                                     courseDesc['coreq'] = corereq
 
+                    # Splits the note form the prereq
                     if "Note:" in prereq:
                         note = prereq.split("Note:", 1)
                         courseDesc['notes'] = note[1]
                         prereq = note[0]
 
                     courseDesc['prereq'] = prereq
+
+                # splits the antireq from the desc
                 if "Antirequisite" in desc:
                     antireq = desc.split("Antirequisite", 1)[1]
                     antireq = self.parseCourseDescription(antireq)
                     courseDesc['antireq'] = antireq
                     desc = antireq[0]
+
+                # removes leftover info from the desc split
                 if desc[-4:] == "and ":
                             desc = desc[:-4]
                 courseDesc['desc'] = desc
 
+            # Upserts course description
             self.db.UAlbertaCourseDesc.update(
                 {'coursenum': entry['attributes']['catalog'], 'subject': entry['attributes']['subject']},
                 {
@@ -362,7 +389,7 @@ class UAlberta(threading.Thread):
                                                        search_filter='(&(!(textbook=*))(class=*)(!(classtime=*)))',
                                                        search_scope=SUBTREE,
                                                        attributes=['asString', 'class', 'term', 'campus',
-                                                                   'classNotes', 'component', 'enrollStatus',
+                                                                   'classType', 'component', 'enrollStatus',
                                                                    'course', 'instructorUid'],
                                                        paged_size=400,
                                                        generator=False)
@@ -396,35 +423,48 @@ class UAlberta(threading.Thread):
         q.join()
 
         log.info('Parsing course data')
+
+        # for each entry in list, upsert course into db
         for entry in entry_list:
             info = str(entry['attributes']['asString']).split(" ")
+
+            # Seperates the subject from the coursenum
             if not info[1].isdigit():
                 subject = info[0] + " " + info[1]
                 coursenum = info[2]
             else:
                 subject = info[0]
                 coursenum = info[1]
+
+            # Does the entry have an enrollStatus
             if entry['attributes']['enrollStatus'] == "O":
                 status = "Open"
             elif entry['attributes']['enrollStatus'] == "C":
                 status = "Closed"
             else:
                 status = entry['attributes']['enrollStatus']
+
+            # Initializes upsert dict
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
                           "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
                           "type": entry['attributes']['component'], "status": status,
-                          "group": entry['attributes']['course'], "times": ["N/A"], "rooms": ["N/A"]}
+                          'classType': entry['attributes']['classType'], "group": entry['attributes']['course'],
+                          "times": ["N/A"], "rooms": ["N/A"]}
+
+            # Does the entry have a instructor assigned to it
             if 'instructorUid' in entry['attributes']:
                 courseList['teachers'] = [self.UidToName(entry['attributes']['instructorUid'][0])]
             else:
                 courseList['teachers'] = ["N/A"]
-            if 'classNotes' in entry['attributes']:
-                courseList["notes"] = entry['attributes']['classNotes'][0]
+
+            # Upserts course into db
             self.db.UAlbertaCourseList.update(
                 {'id': str(entry['attributes']['class'])},
                 {'$set': courseList, '$currentDate': {'lastModified': True}},
                 upsert=True
             )
+
+        # Searches for additional information
         entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                        search_filter='(&(!(textbook=*))(class=*)(classtime=*))',
                                                        search_scope=SUBTREE,
@@ -433,16 +473,24 @@ class UAlberta(threading.Thread):
                                                        paged_size=400,
                                                        generator=False)
         log.info('Matching additional data to course list')
+
+        # for entry in list, match the days, startTime, endTime, and locations to course
         for entry in entry_list:
+
+            # Combines day, startTime, endTime into a duration
             duration = " "
             duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0].replace(" ", ""),
                                       entry['attributes']['endTime'][0].replace(" ", "")))
 
+            # Adds '-' btw the times
             duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
             courseList = {'times': [duration]}
 
+            # Does the class have an assigned classroom
             if 'location' in entry['attributes']:
                 courseList['rooms'] = [entry['attributes']['location']]
+
+            # Upserts additional information
             self.db.UAlbertaCourseList.update(
                 {'id': str(entry['attributes']['class'])},
                 {'$set': courseList, '$currentDate': {'lastModified': True}},
@@ -457,12 +505,18 @@ class UAlberta(threading.Thread):
         :param conn: **ldap connection object**
         :return: **dict** has two keys term and termTitle, values are matched to their respective keys
         """
+
+        # Page queries all terms
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
         terms = []
         for entry in conn.entries:
             termDict = {}
+
+            # If term is past summer 2016
             if int(str(entry['term'])) >= 1566:
+
+                # Adds term to term DB
                 termDict['term'] = str(entry['term'])
                 termDict['termTitle'] = str(entry['termTitle']).replace("Term ", "")
                 self.db.UAlbertaTerms.update(
@@ -471,6 +525,8 @@ class UAlberta(threading.Thread):
                     upsert=True
                 )
                 terms.append(termDict)
+
+        # Returns current terms
         return terms
 
     def updateFaculties(self, conn):
@@ -481,16 +537,26 @@ class UAlberta(threading.Thread):
         :return:
         """
         log.info("Getting faculty list")
+
+        # Gets all recent terms and cycles through them
         for term in self.scrapeTerms(conn):
+
+            # If the term is a continue education term or main term update faculties
             if int(term['term']) % 3 == 0 or int(term['term']) % 10 == 0:
+
+                # Sets the search base for the query
                 searchBase = 'term='+term['term']+', ou=calendar, dc=ualberta, dc=ca'
                 log.info("Updating faculties with search base " + searchBase)
+
+                # Page queries all faculties in current term
                 entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                                search_filter='(term=*)',
                                                                search_scope=LEVEL,
                                                                attributes=['subject', 'subjectTitle', 'faculty'],
                                                                paged_size=400,
                                                                generator=False)
+
+                # For each entry in list updates the faculty
                 for entry in entry_list:
                     if 'subject' in entry['attributes']:
                         self.db.UAlbertaSubjects.update(
@@ -513,11 +579,20 @@ class UAlberta(threading.Thread):
         if self.settings["scrape"]:
             while True:
                 try:
+                    # Establish connection to LDAP server
                     server = Server('directory.srv.ualberta.ca', get_info=ALL)
                     conn = Connection(server, auto_bind=True)
+
+                    # Updates faculties
                     self.updateFaculties(conn)
+
+                    # Get list of current terms
                     terms = self.db.UAlbertaTerms.distinct("term")
+
+                    # For each term, get the courses
                     for term in terms:
+
+                        # If the term is past or equal to the summer of 2016 update courses
                         if int(term) >= 1566:
                             log.info('Obtaining ' + self.db.UAlbertaTerms.find({"term": term})[0]['termTitle'] + ' course data with id ' + term)
                             self.scrapeCourseList(conn, term)
