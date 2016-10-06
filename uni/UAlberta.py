@@ -129,6 +129,7 @@ class UAlberta(threading.Thread):
 
         # Parse each class and get their descriptions
         for course in classes:
+
             del course["_id"]
             if course["subject"] not in responsedict:
                 responsedict[course["subject"]] = {}
@@ -389,7 +390,7 @@ class UAlberta(threading.Thread):
                                                        search_filter='(&(!(textbook=*))(class=*)(!(classtime=*)))',
                                                        search_scope=SUBTREE,
                                                        attributes=['asString', 'class', 'term', 'campus',
-                                                                   'classType', 'component', 'enrollStatus',
+                                                                   'section', 'component', 'enrollStatus',
                                                                    'course', 'instructorUid'],
                                                        paged_size=400,
                                                        generator=False)
@@ -448,7 +449,7 @@ class UAlberta(threading.Thread):
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
                           "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
                           "type": entry['attributes']['component'], "status": status,
-                          'classType': entry['attributes']['classType'], "group": entry['attributes']['course'],
+                          'section': entry['attributes']['section'][0] + entry['attributes']['section'][1], "group": entry['attributes']['course'],
                           "times": ["N/A"], "rooms": ["N/A"]}
 
             # Does the entry have a instructor assigned to it
