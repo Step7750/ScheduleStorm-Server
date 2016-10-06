@@ -449,7 +449,7 @@ class UAlberta(threading.Thread):
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
                           "id": str(entry['attributes']['class']), "location": str(entry['attributes']['campus']),
                           "type": entry['attributes']['component'], "status": status,
-                          'section': entry['attributes']['section'][0] + entry['attributes']['section'][1], "group": entry['attributes']['course'],
+                          'section': entry['attributes']['section'], "group": entry['attributes']['course'],
                           "times": ["N/A"], "rooms": ["N/A"]}
 
             # Does the entry have a instructor assigned to it
