@@ -511,21 +511,24 @@ class UAlberta(threading.Thread):
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
         terms = []
-        for entry in conn.entries:
-            termDict = {}
+        termDict = {}
 
-            # If term is past summer 2016
-            if int(str(entry['term'])) >= 1566:
+        # Gets the four most recent terms
+        for item in range(1, 5):
+            entry = conn.entries[len(conn.entries)-item]
+            termDict['term'] = str(entry['term'])
+            termDict['termTitle'] = str(entry['termTitle']).replace("Term ", "")
 
-                # Adds term to term DB
-                termDict['term'] = str(entry['term'])
-                termDict['termTitle'] = str(entry['termTitle']).replace("Term ", "")
-                self.db.UAlbertaTerms.update(
-                    {'term': str(entry['term'])},
-                    {'$set': termDict},
-                    upsert=True
-                )
-                terms.append(termDict)
+            # Adds term to term DB
+            self.db.UAlbertaTerms.update(
+                {'term': str(entry['term'])},
+                {'$set': termDict},
+                upsert=True
+            )
+
+            terms.append(termDict)
+
+
 
         # Returns current terms
         return terms
@@ -592,12 +595,9 @@ class UAlberta(threading.Thread):
 
                     # For each term, get the courses
                     for term in terms:
-
-                        # If the term is past or equal to the summer of 2016 update courses
-                        if int(term) >= 1566:
-                            log.info('Obtaining ' + self.db.UAlbertaTerms.find({"term": term})[0]['termTitle'] + ' course data with id ' + term)
-                            self.scrapeCourseList(conn, term)
-                            self.scrapeCourseDesc(conn, term)
+                        log.info('Obtaining ' + self.db.UAlbertaTerms.find({"term": term})[0]['termTitle'] + ' course data with id ' + term)
+                        self.scrapeCourseList(conn, term)
+                        self.scrapeCourseDesc(conn, term)
                     log.info('Finished scraping for UAlberta data')
                     pass
                 except Exception as e:
