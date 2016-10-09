@@ -184,6 +184,47 @@ class MTRoyal(threading.Thread):
         else:
             return False
 
+
+    def getTermClasses(self, termid, subjects):
+        postdata = "rsts=dummy" \
+                   "&crn=dummy" \
+                   "&term_in=" + str(termid) + \
+                   "&sel_subj=dummy" \
+                   "&sel_day=dummy" \
+                   "&sel_schd=dummy" \
+                   "&sel_insm=dummy" \
+                   "&sel_camp=dummy" \
+                   "&sel_levl=dummy" \
+                   "&sel_sess=dummy" \
+                   "&sel_instr=dummy" \
+                   "&sel_ptrm=dummy" \
+                   "&sel_attr=dummy" \
+                   "&sel_crse=" \
+                   "&sel_title=" \
+                   "&begin_hh=0" \
+                   "&begin_mi=0" \
+                   "&begin_ap=a" \
+                   "&end_hh=0" \
+                   "&end_mi=0" \
+                   "&end_ap=a" \
+                   "&SUB_BTN=Section+Search" \
+                   "&path=1"
+
+        # add the subjects we want
+        for subject in subjects:
+            postdata += "&sel_subj=" + subject
+
+        classreply = self.loginSession.post("https://mruweb.mymru.ca/prod/bwskfcls.P_GetCrse_Advanced", data=postdata)
+
+        if classreply.status_code == requests.codes.ok:
+            if "No classes were found that meet your search criteria" not in classreply.text:
+                return classreply.text
+            else:
+                return False
+        else:
+            return False
+
+
     def run(self):
         """
         Scraping thread that obtains updated course info
@@ -203,6 +244,7 @@ class MTRoyal(threading.Thread):
                         if terms:
                             for term in terms:
                                 termsubjects = self.getSubjectsForTerm(term)
+                                classdata = self.getTermClasses(term, termsubjects)
                                 log.info(termsubjects)
                                 
                 except Exception as e:
