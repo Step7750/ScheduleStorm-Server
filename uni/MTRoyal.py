@@ -249,6 +249,136 @@ class MTRoyal(threading.Thread):
         else:
             return False
 
+    def parseNotes(self, note, curdict):
+        """
+        Given a note for a class and the current groupings dictionary, process the notes and group up classes
+
+        For example: Lecture 007 take one of tutorials 401-403 or 406-407 and one of labs 501-502
+
+        This function will make sure that LEC 001 and Labs 501 and 502 have the same group number
+        For a given course, this function can be repeatedly called with different classes to ensure grouping
+
+        :param note: **String** Note to parse
+        :param curdict: **dict** Current groupings
+        :return:
+        """
+        # Any two courses that have the same group number can be taken together
+
+        # Calculate the starting group number
+        curgroupnum = 0
+        for val in curdict:
+            if curdict[val] > curgroupnum:
+                curgroupnum = curdict[val]
+
+        # The starting new group number is one higher than the current
+        curgroupnum += 1
+
+        # Check if this is a valid note structure
+        isValidNote = re.search("(\w[ \w]*) (\d*) take ([^.]*)", note)
+
+        if isValidNote:
+            notegroups = isValidNote.groups()
+
+            # Make sure the type is in our dict
+            if notegroups[0].upper() in self.invertedTypes:
+                # Now we want to split the string by "and"
+                classgroups = notegroups[2]
+
+                # split by "and" and process separately
+                classgroups = classgroups.split("and")
+
+                # Get the value of this class in the dict
+                callingClass = self.invertedTypes[notegroups[0].upper()] + " " + notegroups[1]
+
+                # set the default value
+                curdict[callingClass] = curgroupnum
+                curgroupnum += 1
+
+                for group in classgroups:
+                    group = group.strip()
+
+                    # boolean as to whether the string starts with "one of"
+                    oneof = False
+
+                    # remove "one of" at the beginning
+                    if group.startswith("one of"):
+                        group = group.replace("one of", "").strip()
+                        oneof = True
+
+                    # Type, such as LAB, TUT
+                    foundType = False
+
+                    # Try to find the instruction type
+                    instructiontype = re.search("(\D*)", group)
+
+                    # Convert it to the code
+                    if instructiontype:
+                        group = group.replace(instructiontype.groups()[0], "").strip()
+                        instructiontype = instructiontype.groups()[0].upper().strip()
+
+                        # if one of, remove the last s (ex. tutorials = tutorial)
+                        if oneof:
+                            instructiontype = instructiontype[:len(instructiontype)-1]
+
+                        # Get the type
+                        if instructiontype in self.invertedTypes:
+                            instructiontype = self.invertedTypes[instructiontype]
+                            foundType = instructiontype
+
+                    if foundType:
+                        # process the statement
+                        self.processNoteFragment(group, curdict, curgroupnum, callingClass, foundType)
+
+    def classRange(self, classes):
+        """
+        Returns an array of classes given the range (ex. 505-507 becomes ["505", "506", "507"])
+
+        :param classes:
+        :return:
+        """
+        classes = classes.split("-")
+        response = []
+
+        for i in range(int(classes[0]), int(classes[1])+1):
+            response.append(str(i))
+
+        return response
+
+    def processNoteFragment(self, group, curdict, curgroupnum, callingClass, type):
+        """
+        For a given note fragment, processes the meaning behind the note and adds the definition to curdict
+
+        :param group: **String** Text fragment to process
+        :param curdict: **dict** Definitions of current course groupinga
+        :param curgroupnum: **int** Starting new group number
+        :param callingClass: **String** Dictionary key of the originating class to group with
+        :param type: **String** Type of class
+        :return:
+        """
+        orgroups = group.split(" or ")
+
+        for group in orgroups:
+            classes = []
+
+            # We want a list of classes that this is linked to
+            # check to see if its a range
+            if "-" in group:
+                classes = self.classRange(group)
+            elif "," in group:
+                classes = group.split(",")
+            else:
+                classes.append(group)
+
+            # For every class, link it
+            for classv in classes:
+                classcode = type + " " + classv.strip()
+                if classcode in curdict:
+                    # Set the calling class to this group number
+                    # (maybe make an array of groups later, this may have issues)
+                    curdict[callingClass] = curdict[classcode]
+                else:
+                    curdict[classcode] = (curgroupnum-1)
+
     def parseClassList(self, classlist, termid):
         """
         Parses the given class list HTML and inserts the courses into the DB
@@ -256,7 +386,7 @@ class MTRoyal(threading.Thread):
         :param termid: **int/string** Term ID that these classes belong to
         :return:
         """
-        log.info("\n\nNEW TERM  ", termid, "\n\n ")
+        log.info("\n\nNEW TERM  " + str(termid) + "\n\n")
         classlist = BeautifulSoup(classlist, "lxml")
 
         # Get the table that has the classes
@@ -290,6 +420,7 @@ class MTRoyal(threading.Thread):
         # Copy of the last class
         lastClassCopy = {}
         courseClasses = []
+        courseGroupings = {}
 
         for row in displaytable.findAll("tr"):
             title = row.find("th", {"class": "ddtitle"})
@@ -312,111 +443,111 @@ class MTRoyal(threading.Thread):
                     isNote = False
 
                     # current index of the column
-                    index = 0
+                    columnIndex = 0
 
                     # For every column in this row, extract class info
                     for column in row.findAll("td"):
-                        if index == 0 and column.text == u'\xa0':
+                        if columnIndex == 0 and column.text == u'\xa0':
                             # This is an extension of the previous class (probably a note row or something)
                             isLastClass = True
 
                             # We can replace this class with the previous one
                             thisClass = lastClassCopy
 
-                        if (index > 0 and isLastClass is False) or (index > 5 and isLastClass is True):
-                            if isLastClass and index == 6 and "Note" in column.text:
+                        if (columnIndex > 0 and isLastClass is False) or (columnIndex > 5 and isLastClass is True):
+                            if isLastClass and columnIndex == 6 and "Note" in column.text:
                                 # This row is a "Note"
                                 isNote = True
 
-                            elif isNote and index == 7:
-                                # TODO: Parse the note (get group info)
-                                pass
+                            elif isNote and columnIndex == 7:
+                                # Parse the note into groupings if applicable
+                                self.parseNotes(column.text.strip('\n').strip(), courseGroupings)
                             else:
                                 # Just process the column
-                                if index < len(columnKeys) and columnKeys[index] is not False:
+                                if columnIndex < len(columnKeys) and columnKeys[columnIndex] is not False:
                                     # Get the column text
                                     thiscolumn = column.text.strip()
 
                                     # update the obj for this class
-                                    if index == 0 and isLastClass is False:
+                                    if columnIndex == 0 and isLastClass is False:
                                         # If this is "C", the class is closed, we don't extract anymore info
                                         if thiscolumn == "C":
-                                            thisClass[columnKeys[index]["name"]] = "Closed"
+                                            thisClass[columnKeys[columnIndex]["name"]] = "Closed"
 
-                                    elif index == 3 and isLastClass is False:
+                                    elif columnIndex == 3 and isLastClass is False:
                                         # parse the course number (some additional logic)
                                         # If the course number is different than the previous, set the boolean flag
-                                        if columnKeys[index]["name"] in lastClassCopy \
+                                        if columnKeys[columnIndex]["name"] in lastClassCopy \
                                                 and lastClassCopy["coursenum"] != thiscolumn:
                                             newCourse = True
 
                                         # replace the course number
-                                        thisClass[columnKeys[index]["name"]] = thiscolumn
+                                        thisClass[columnKeys[columnIndex]["name"]] = thiscolumn
 
-                                    elif index == 8:
+                                    elif columnIndex == 8:
                                         # Days of the week, ex. MTF
 
                                         # If this isn't already a list, make it
-                                        if columnKeys[index]["name"] not in thisClass:
-                                            thisClass[columnKeys[index]["name"]] = []
+                                        if columnKeys[columnIndex]["name"] not in thisClass:
+                                            thisClass[columnKeys[columnIndex]["name"]] = []
 
                                         # Simply add the dates
-                                        thisClass[columnKeys[index]["name"]].append(thiscolumn)
+                                        thisClass[columnKeys[columnIndex]["name"]].append(thiscolumn)
 
-                                    elif index == 9:
+                                    elif columnIndex == 9:
                                         # 01:00 pm-01:50 pm -> 3:30PM - 5:20PM
                                         thiscolumn = thiscolumn.replace("-", " - ")\
                                                                 .replace(" pm", "PM")\
                                                                 .replace(" am", "AM")
 
                                         # Might be a TBA with no date, if so, don't add spaces
-                                        if thisClass[columnKeys[index]["name"]][-1] != "":
+                                        if thisClass[columnKeys[columnIndex]["name"]][-1] != "":
                                             thiscolumn = " " + thiscolumn
 
-                                        thisClass[columnKeys[index]["name"]][-1] += thiscolumn
+                                        thisClass[columnKeys[columnIndex]["name"]][-1] += thiscolumn
 
-                                    elif index == 12 and isLastClass is False:
+                                    elif columnIndex == 12 and isLastClass is False:
                                         # only get the parent remainder value
                                         try:
                                             thiscolumn = int(thiscolumn)
                                             # If there are remaining seats, its open
                                             if thiscolumn > 0:
-                                                thisClass[columnKeys[index]["name"]] = "Open"
+                                                thisClass[columnKeys[columnIndex]["name"]] = "Open"
                                             else:
                                                 # check if the parameter is already closed, if not, wait list
-                                                if columnKeys[index]["name"] not in thisClass:
-                                                    thisClass[columnKeys[index]["name"]] = "Wait List"
+                                                if columnKeys[columnIndex]["name"] not in thisClass:
+                                                    thisClass[columnKeys[columnIndex]["name"]] = "Wait List"
                                         except:
-                                            thisClass[columnKeys[index]["name"]] = "Closed"
+                                            thisClass[columnKeys[columnIndex]["name"]] = "Closed"
 
-                                    elif index == 14:
+                                    elif columnIndex == 14:
                                         # strip the ending p
                                         thiscolumn = thiscolumn.rstrip(' (P)').strip()
 
                                         # If this key isn't already in last class, make it
-                                        if columnKeys[index]["name"] not in thisClass:
-                                            thisClass[columnKeys[index]["name"]] = []
+                                        if columnKeys[columnIndex]["name"] not in thisClass:
+                                            thisClass[columnKeys[columnIndex]["name"]] = []
 
                                         # check if the name is already there
-                                        if thiscolumn not in thisClass[columnKeys[index]["name"]]:
+                                        if thiscolumn not in thisClass[columnKeys[columnIndex]["name"]]:
                                             # add it
-                                            thisClass[columnKeys[index]["name"]].append(thiscolumn)
+                                            thisClass[columnKeys[columnIndex]["name"]].append(thiscolumn)
 
-                                    elif index == 16:
+                                    elif columnIndex == 16:
                                         # handle rooms
 
                                         # Check if this index is already a list, if not, make it
-                                        if columnKeys[index]["name"] not in thisClass:
-                                                thisClass[columnKeys[index]["name"]] = []
+                                        if columnKeys[columnIndex]["name"] not in thisClass:
+                                                thisClass[columnKeys[columnIndex]["name"]] = []
 
                                         # Append this room
-                                        thisClass[columnKeys[index]["name"]].append(thiscolumn)
+                                        thisClass[columnKeys[columnIndex]["name"]].append(thiscolumn)
 
                                     elif isLastClass is False:
                                         # nothing else to do, update the dict
-                                        thisClass[columnKeys[index]["name"]] = column.text
+                                        thisClass[columnKeys[columnIndex]["name"]] = column.text
 
-                        index += 1
+                        columnIndex += 1
 
 
                     lastClassCopy = thisClass
@@ -426,18 +557,18 @@ class MTRoyal(threading.Thread):
                     if not newCourse and isLastClass is False:
                         courseClasses.append(thisClass)
                     elif newCourse:
+                        log.info(courseGroupings)
                         log.info(courseClasses)
                         del courseClasses[:]
+                        courseGroupings = {}
                         courseClasses.append(thisClass)
 
                     thisClass = {}
 
 
-        # We need to print the very last course here
+        # We need to add the very last course here
+        log.info(courseGroupings)
         log.info(courseClasses)
-
-
-
 
     def run(self):
         """
