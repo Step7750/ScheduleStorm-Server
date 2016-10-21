@@ -50,6 +50,11 @@ class MTRoyal(threading.Thread):
             ("term", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.MTRoyalCourseDesc.create_index([
+            ("coursenum", pymongo.ASCENDING),
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -405,7 +410,7 @@ class MTRoyal(threading.Thread):
                       {"name": "coursenum", "type": "string"},
                       {"name": "section", "type": "string"},
                       False,
-                      False,
+                      {"name": "title", "type": "string"},
                       {"name": "type", "type": "string"},
                       {"name": "times", "type": "list"},
                       {"name": "times", "type": "list"},
@@ -595,8 +600,14 @@ class MTRoyal(threading.Thread):
         """
         term = int(term)
 
+        # bool defining whether we're already fetching course descriptions for this course
+        retrievingDesc = False
 
         for thisclass in classlist:
+            thistitle = thisclass["title"]
+
+            del thisclass["title"]
+
             thisclass["term"] = term
             groupkey = thisclass["type"] + " " + thisclass["section"]
 
@@ -618,6 +629,20 @@ class MTRoyal(threading.Thread):
                 },
                 upsert=True
             )
+
+            if not retrievingDesc:
+                # check whether we need to grab a description for this course
+                hasDesc = self.db.MTRoyalCourseDesc.find_one({"coursenum": thisclass["coursenum"],
+                                                              "subject": thisclass["subject"],
+                                                              "desc": {"$exists": True}})
+
+                if not hasDesc:
+                    # We'll make a thread to try to retrieve the description for this course
+                    retrievingDesc = True
+
+                    descthread = CourseDescriptions(thisclass["coursenum"], thisclass["subject"], thistitle)
+                    descthread.setDaemon(True)
+                    descthread.start()
 
 
     def run(self):
@@ -656,3 +681,97 @@ class MTRoyal(threading.Thread):
                 time.sleep(self.settings["scrapeinterval"])
         else:
             log.info("Scraping is disabled")
+
+
+class CourseDescriptions(threading.Thread):
+    """
+    Mines course descriptions from the Mount Royal Site for the specified course
+    """
+
+    mainpage = "http://www.ucalgary.ca/pubs/calendar/current/"
+    fullname = ""  # full name of the subject (CPSC = Computer Science)
+
+    def __init__(self, coursenum, subject, title):
+        """
+        Constructor for retrieving course descriptions
+
+        :param coursenum: **string** Course number to retrieve the description for
+        :param subject: **string** Subject to retrieve the description for
+        :param title: **string** The title of the course in the course list
+        :return:
+        """
+        threading.Thread.__init__(self)
+        self.db = pymongo.MongoClient().ScheduleStorm
+        self.coursenum = coursenum
+        self.subject = subject
+        self.title = title
+
+    def run(self):
+        urlfetch = "http://www.mtroyal.ca/ProgramsCourses/CourseListings/" \
+                   + self.subject.lower() + self.coursenum + ".htm"
+
+        # get the description page
+        r = requests.get(urlfetch)
+
+        if "page not found" not in r.text and r.status_code == requests.codes.ok:
+            # setup the obj
+            descobj = {"subject": self.subject, "coursenum": self.coursenum, "name": self.title}
+
+            soup = BeautifulSoup(r.text, "lxml")
+
+            # index for the different rows on the page
+            index = 0
+
+            # Find the title of the course and if its valid, replace the constructor title
+            # Usually the course description title is more verbose/accurate than the class list version
+            titlediv = soup.find("article", {"class": "welcome"}).find('h2', {'class': 'title'})
+            titlediv = titlediv.text.strip().split('–')
+
+            if len(titlediv) > 1:
+                descobj["name"] = "–".join(titlediv[1:]).strip()
+
+            # For every valid article row, parse it
+            for p in soup.find("article", {"class": "welcome"}).find_all("p"):
+                # Replace br with \n
+                for br in p.find_all("br"):
+                    br.replace_with("\n")
+
+                # For every valid new line in p
+                for row in p.text.split("\n"):
+                    row = row.strip().replace('\xa0', " ")
+
+                    if row != '':
+                        # Modify the corresponding data to the row index
+                        if index == 0:
+                            descobj["hours"] = row
+                        elif index == 1:
+                            descobj["desc"] = row
+                        else:
+                            # Seperate the row title and data
+                            row = row.split(":")
+                            rowtitle = row[0].strip()
+                            row = ":".join(row[1:]).strip()
+
+                            if rowtitle.startswith("Note"):
+                                descobj["note"] = row
+                            elif rowtitle.startswith("Prereq"):
+                                descobj["prereq"] = row
+                            elif rowtitle.startswith("Coreq"):
+                                descobj["coreq"] = row
+                            elif rowtitle.startswith("antireq"):
+                                descobj["antireq"] = row
+
+                        index += 1
+
+
+            log.debug(descobj)
+
+            # Upsert the updated description into the DB
+            self.db.MTRoyalCourseDesc.update(
+                {"coursenum": descobj["coursenum"], "subject": descobj["subject"]},
+                {
+                    "$set": descobj,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
