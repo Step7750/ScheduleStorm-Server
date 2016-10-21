@@ -43,6 +43,13 @@ class MTRoyal(threading.Thread):
         self.db = pymongo.MongoClient().ScheduleStorm
         self.invertedTypes = {v: k for k, v in self.instructionTypes.items()}
 
+        log.info("Ensuring indexes exist...")
+
+        self.db.MTRoyalCourseList.create_index([
+            ("id", pymongo.ASCENDING),
+            ("term", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -531,7 +538,8 @@ class MTRoyal(threading.Thread):
                                         # check if the name is already there
                                         if thiscolumn not in thisClass[columnKeys[columnIndex]["name"]]:
                                             # add it
-                                            thisClass[columnKeys[columnIndex]["name"]].append(thiscolumn)
+                                            thisClass[columnKeys[columnIndex]["name"]]\
+                                                .append(thiscolumn.replace("  ", " "))
 
                                     elif columnIndex == 16:
                                         # handle rooms
@@ -545,30 +553,72 @@ class MTRoyal(threading.Thread):
 
                                     elif isLastClass is False:
                                         # nothing else to do, update the dict
-                                        thisClass[columnKeys[columnIndex]["name"]] = column.text
+                                        if columnKeys[columnIndex]["type"] == "int":
+                                            thiscolumn = int(thiscolumn)
+
+                                        thisClass[columnKeys[columnIndex]["name"]] = thiscolumn
 
                         columnIndex += 1
 
-
+                    # overwrite the copy
                     lastClassCopy = thisClass
 
                     rowindex += 1
 
                     if not newCourse and isLastClass is False:
+                        # just append the class
                         courseClasses.append(thisClass)
                     elif newCourse:
-                        log.info(courseGroupings)
-                        log.info(courseClasses)
+                        # push the classes to the db
+                        #log.info(courseGroupings)
+                        #log.info(courseClasses)
+                        self.addClasses(courseClasses, courseGroupings, termid)
                         del courseClasses[:]
                         courseGroupings = {}
                         courseClasses.append(thisClass)
 
+                    # reset the class dict
                     thisClass = {}
 
-
         # We need to add the very last course here
-        log.info(courseGroupings)
-        log.info(courseClasses)
+        #log.info(courseGroupings)
+        #log.info(courseClasses)
+        self.addClasses(courseClasses, courseGroupings, termid)
+
+    def addClasses(self, classlist, groupings, term):
+        """
+        Adds the given classes in classlist to the DB with the appropriate groupings
+        :param classlist: **list** Contains dictionaries of class properties
+        :param groupings: **dict** Class groupings
+        :param term: **int/str** Term ID
+        :return:
+        """
+        term = int(term)
+
+
+        for thisclass in classlist:
+            thisclass["term"] = term
+            groupkey = thisclass["type"] + " " + thisclass["section"]
+
+            if groupkey in groupings:
+                # set the group id
+                thisclass["group"] = str(groupings[groupkey])
+            else:
+                # just set a default group of 1
+                thisclass["group"] = "1"
+
+            thisclass["location"] = "Main Campus"
+
+            # Upsert the object
+            self.db.MTRoyalCourseList.update(
+                {"id": thisclass["id"], "term": thisclass["term"]},
+                {
+                    "$set": thisclass,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
+
 
     def run(self):
         """
