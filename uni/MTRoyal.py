@@ -453,8 +453,9 @@ class MTRoyal(threading.Thread):
         # Calculate the starting group number
         curgroupnum = 0
         for val in curdict:
-            if curdict[val] > curgroupnum:
-                curgroupnum = curdict[val]
+            for groupval in curdict[val]:
+                if int(groupval) > curgroupnum:
+                    curgroupnum = int(groupval)
 
         # The starting new group number is one higher than the current
         curgroupnum += 1
@@ -477,7 +478,7 @@ class MTRoyal(threading.Thread):
                 callingClass = self.invertedTypes[notegroups[0].upper()] + " " + notegroups[1]
 
                 # set the default value
-                curdict[callingClass] = curgroupnum
+                curdict[callingClass] = [curgroupnum]
                 curgroupnum += 1
 
                 for group in classgroups:
@@ -558,12 +559,11 @@ class MTRoyal(threading.Thread):
             # For every class, link it
             for classv in classes:
                 classcode = type + " " + classv.strip()
-                if classcode in curdict:
-                    # Set the calling class to this group number
-                    # (maybe make an array of groups later, this may have issues)
-                    curdict[callingClass] = curdict[classcode]
-                else:
-                    curdict[classcode] = (curgroupnum-1)
+
+                if classcode not in curdict:
+                    curdict[classcode] = []
+
+                curdict[classcode].append(str(curgroupnum-1))
 
     def parseClassList(self, classlist, termid):
         """
@@ -802,10 +802,10 @@ class MTRoyal(threading.Thread):
 
             if groupkey in groupings:
                 # set the group id
-                thisclass["group"] = str(groupings[groupkey])
+                thisclass["group"] = groupings[groupkey]
             else:
                 # just set a default group of 1
-                thisclass["group"] = "1"
+                thisclass["group"] = ["1"]
 
             thisclass["location"] = "Main Campus"
 
