@@ -97,6 +97,83 @@ class MTRoyal(threading.Thread):
 
         return response
 
+    def matchRMPNames(self, distinctteachers):
+        """
+        Given a list of teachers to match RMP data to, this function obtains all RMP data and tries to match the names
+        with the distinctteachers list and returns the matches
+
+        We first check whether the constructed name is simply the same in RMP
+        If not, we check whether the first and last words in a name in RMP is the same
+        If not, we check whether any first and last words in the teachers name has a result in RMP that starts
+            with the first and last words
+        If not, we give up and don't process the words
+
+        Most teachers should have a valid match using this method, many simply don't have a profile on RMP
+        Around 80%+ of valid teachers on RMP should get a match
+
+        False positives are possible, but highly unlikely given that it requires the first and last name of the
+        wrong person to start the same way
+
+        :param distinctteachers: **list** Distinct list of all teachers to find an RMP match for
+        :return: **dict** Matched teachers and their RMP ratings
+        """
+        # Get the RMP data for all teachers at UCalgary
+        rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
+
+        returnobj = {}
+
+        # We want to construct the names of each teacher and invert the results for easier parsing
+        # and better time complexity
+        rmpinverted = {}
+
+        for teacher in rmp:
+            # Construct the name
+            fullname = ""
+            if "firstname" in teacher:
+                fullname += teacher["firstname"]
+            if "middlename" in teacher:
+                fullname += " " + teacher["middlename"]
+            if "lastname" in teacher:
+                fullname += " " + teacher["lastname"]
+
+            # remove unnecessary fields
+            del teacher["_id"]
+            del teacher["lastModified"]
+            del teacher["school"]
+
+            rmpinverted[fullname] = teacher
+
+        # Iterate through each distinct teacher
+        for teacher in distinctteachers:
+            if teacher in rmpinverted:
+                # We found an instant match, add it to the return dict
+                returnobj[teacher] = rmpinverted[teacher]
+            else:
+                # Find the first and last words of the name
+                teacherNameSplit = teacher.split(" ")
+                lastword = teacherNameSplit[-1]
+                firstword = teacherNameSplit[0]
+
+                # Check to see if the first and last words find a match (without a middle name)
+                namewithoutmiddle = firstword + " " + lastword
+
+                if namewithoutmiddle in rmpinverted:
+                    # Found the match! Add an alias field
+                    returnobj[teacher] = rmpinverted[namewithoutmiddle]
+                else:
+                    # Find a teacher in RMP that had the first and last words of their name starting the
+                    # respective words in the original teacher's name
+                    for teacher2 in rmpinverted:
+                        splitname = teacher2.split(" ")
+                        first = splitname[0]
+                        last = splitname[-1]
+
+                        if lastword.startswith(last) and firstword.startswith(first):
+                            returnobj[teacher] = rmpinverted[teacher2]
+                            break
+
+        return returnobj
+
     def getSubjectListAll(self, term):
         """
         API Handler
@@ -151,9 +228,11 @@ class MTRoyal(threading.Thread):
             for teacher in classv["teachers"]:
                 if teacher not in distinctteachers:
                     distinctteachers.append(teacher)
+        
+        rmpobj = self.matchRMPNames(distinctteachers)
 
         # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": responsedict, "rmp": {}}
+        return {"classes": responsedict, "rmp": rmpobj}
 
     def login(self):
         """
