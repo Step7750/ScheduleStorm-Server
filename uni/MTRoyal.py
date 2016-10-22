@@ -607,11 +607,12 @@ class MTRoyal(threading.Thread):
                                         if columnKeys[columnIndex]["name"] not in thisClass:
                                             thisClass[columnKeys[columnIndex]["name"]] = []
 
+                                        teacherFormattedName = thiscolumn.replace("   ", " ").replace("  ", " ")
+
                                         # check if the name is already there
                                         if thiscolumn not in thisClass[columnKeys[columnIndex]["name"]]:
-                                            # add it
-                                            thisClass[columnKeys[columnIndex]["name"]]\
-                                                .append(thiscolumn.replace("  ", " "))
+                                            if teacherFormattedName not in thisClass[columnKeys[columnIndex]["name"]]:
+                                                thisClass[columnKeys[columnIndex]["name"]].append(teacherFormattedName)
 
                                     elif columnIndex == 16:
                                         # handle rooms
