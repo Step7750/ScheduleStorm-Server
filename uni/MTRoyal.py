@@ -55,6 +55,10 @@ class MTRoyal(threading.Thread):
             ("subject", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.MTRoyalSubjects.create_index([
+            ("subject", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -644,6 +648,31 @@ class MTRoyal(threading.Thread):
                     descthread.setDaemon(True)
                     descthread.start()
 
+    def updateSubjects(self, subjects):
+        """
+        Upserts a given dictionary of subjects into the DB
+        :param subjects: **dict** Keys are the subject codes, values are the names
+        :return:
+        """
+        log.debug("Updating subject definitions")
+        for subject in subjects:
+            subjectname = subjects[subject]
+
+            subjectdict = {
+                "subject": subject,
+                "name": subjectname
+            }
+
+            # Update the subject data in the DB
+            self.db.MTRoyalSubjects.update(
+                {"subject": subjectdict["subject"]},
+                {
+                    "$set": subjectdict,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
+
 
     def run(self):
         """
@@ -668,12 +697,17 @@ class MTRoyal(threading.Thread):
                                 # Get the subjects
                                 termsubjects = self.getSubjectsForTerm(term)
 
-                                # Get the class data for the previous subjects
-                                classdata = self.getTermClasses(term, termsubjects)
+                                if termsubjects is not False:
+                                    # Update the DB listings for the subjects
+                                    self.updateSubjects(termsubjects)
 
-                                # If we got class data, parse it
-                                if classdata:
-                                    self.parseClassList(classdata, term)
+                                    # Get the class data for the previous subjects
+                                    classdata = self.getTermClasses(term, termsubjects)
+
+                                    # If we got class data, parse it
+                                    if classdata:
+                                        self.parseClassList(classdata, term)
+
                 except Exception as e:
                     log.critical("Exception | " + str(e))
 
