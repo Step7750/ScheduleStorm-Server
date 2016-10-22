@@ -27,6 +27,8 @@
             "userid": "",
             "pin": "",
             "_comment_login": "Use your login for this page: https://mruweb.mymru.ca/prod/bwskfreg.P_AltPin",
+            "descConcurrency": 5,
+            "_comment_descConcurrency": "Amount of concurrent scrapers that scrape mount royal course info",
             "scrapeinterval": 7200,
             "rmpid": 1570
         }
