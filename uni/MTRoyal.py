@@ -59,6 +59,10 @@ class MTRoyal(threading.Thread):
             ("subject", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.MTRoyalTerms.create_index([
+            ("term", pymongo.ASCENDING)],
+            unique=True)
+
     def getTerms(self):
         """
         API Handler
@@ -67,11 +71,12 @@ class MTRoyal(threading.Thread):
 
         :return: **dict** Keys are the ids, values are the proper names
         """
-        termlist = self.db.MTRoyalCourseList.distinct("term")
+        termlist = self.db.MTRoyalTerms.find({"viewonly": False})
+
         responsedict = {}
 
         for term in termlist:
-            responsedict[str(term)] = self.termIDToName(term)
+            responsedict[term["term"]] = term["name"]
 
         return responsedict
 
@@ -130,7 +135,7 @@ class MTRoyal(threading.Thread):
         else:
             return False
 
-    def getTerms(self):
+    def obtainActiveTerms(self):
         """
         Retrieves and parses the terms list
 
@@ -153,6 +158,8 @@ class MTRoyal(threading.Thread):
                     # We want this year or next year in the text (don't want old terms)
                     thisyear = datetime.now().year
 
+                    dbtermdict = {"term": termoption['value'], "name": termtext.strip(), "viewonly": True}
+
                     if str(thisyear) in termtext or str(thisyear+1) in termtext:
                         log.debug(termtext + " is within this year or the next")
 
@@ -161,6 +168,17 @@ class MTRoyal(threading.Thread):
                         if "view only" not in termtext.lower():
                             # add it to the dict
                             response_dict[termoption['value']] = termtext.strip()
+                            dbtermdict["viewonly"] = False
+
+                    # Update the term data in the DB
+                    self.db.MTRoyalTerms.update(
+                        {"term": dbtermdict["term"]},
+                        {
+                            "$set": dbtermdict,
+                            "$currentDate": {"lastModified": True}
+                        },
+                        upsert=True
+                    )
 
             return response_dict
 
@@ -673,7 +691,6 @@ class MTRoyal(threading.Thread):
                 upsert=True
             )
 
-
     def run(self):
         """
         Scraping thread that obtains updated course info
@@ -688,7 +705,7 @@ class MTRoyal(threading.Thread):
                     log.info("Scraping now")
                     if self.login():
                         # Get the terms
-                        terms = self.getTerms()
+                        terms = self.obtainActiveTerms()
 
                         log.debug(terms)
 
