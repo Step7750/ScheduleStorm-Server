@@ -106,9 +106,54 @@ class MTRoyal(threading.Thread):
         :param term: **string/int** ID of the term
         :return: **dict** All data for the term
         """
+        responsedict = {}
+
+        classes = self.db.MTRoyalCourseList.find({"term": int(term)})
+        distinctteachers = []
+
+        # Parse each class and get their descriptions
+        for classv in classes:
+            del classv["_id"]
+
+            if classv["subject"] not in responsedict:
+                responsedict[classv["subject"]] = {}
+
+            if classv["coursenum"] not in responsedict[classv["subject"]]:
+                responsedict[classv["subject"]][classv["coursenum"]] = {"classes": []}
+
+            subj = classv["subject"]
+            coursen = classv["coursenum"]
+
+            # Get the class description
+            if "description" not in responsedict[subj][coursen]:
+                result = self.db.MTRoyalCourseDesc.find_one({"coursenum": coursen, "subject": subj})
+
+                if result:
+                    # Remove unneeded fields
+                    del result["_id"]
+                    del result["subject"]
+                    del result["coursenum"]
+                    del result["lastModified"]
+
+                    responsedict[subj][coursen]["description"] = result
+                else:
+                    responsedict[subj][coursen]["description"] = False
+
+            # Remove unneeded fields
+            del classv["subject"]
+            del classv["coursenum"]
+            del classv["lastModified"]
+
+            # Add this class to the course list
+            responsedict[subj][coursen]["classes"].append(classv)
+
+            # Find distinct teachers and append them to distinctteachers
+            for teacher in classv["teachers"]:
+                if teacher not in distinctteachers:
+                    distinctteachers.append(teacher)
 
         # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": {}, "rmp": {}}
+        return {"classes": responsedict, "rmp": {}}
 
     def login(self):
         """
