@@ -864,32 +864,32 @@ class MTRoyal(threading.Thread):
         if self.settings["scrape"]:
             while True:
 
-                #try:
-                log.info("Scraping now")
-                if self.login():
-                    # Get the terms
-                    terms = self.obtainActiveTerms()
+                try:
+                    log.info("Scraping now")
+                    if self.login():
+                        # Get the terms
+                        terms = self.obtainActiveTerms()
 
-                    log.debug(terms)
+                        log.debug(terms)
 
-                    if terms:
-                        for term in terms:
-                            # Get the subjects
-                            termsubjects = self.getSubjectsForTerm(term)
+                        if terms:
+                            for term in terms:
+                                # Get the subjects
+                                termsubjects = self.getSubjectsForTerm(term)
 
-                            if termsubjects is not False:
-                                # Update the DB listings for the subjects
-                                self.updateSubjects(termsubjects)
+                                if termsubjects is not False:
+                                    # Update the DB listings for the subjects
+                                    self.updateSubjects(termsubjects)
 
-                                # Get the class data for the previous subjects
-                                classdata = self.getTermClasses(term, termsubjects)
+                                    # Get the class data for the previous subjects
+                                    classdata = self.getTermClasses(term, termsubjects)
 
-                                # If we got class data, parse it
-                                if classdata:
-                                    self.parseClassList(classdata, term)
+                                    # If we got class data, parse it
+                                    if classdata:
+                                        self.parseClassList(classdata, term)
 
-                #except Exception as e:
-                    #log.critical("Exception | " + str(e))
+                except Exception as e:
+                    log.critical("Exception | " + str(e))
 
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
