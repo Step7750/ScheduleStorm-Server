@@ -14,6 +14,7 @@ import logging
 import requests
 from datetime import datetime
 import re
+from queue import Queue
 import json
 
 
@@ -174,6 +175,30 @@ class MTRoyal(threading.Thread):
 
         return returnobj
 
+    def retrieveSubjectDesc(self, subjects):
+        """
+        Given a subject dict, retrieves the description for each subject
+
+        Note: We weren't able to find reliable Faculty information, thus the first depth level is subjects
+
+        :param subjects: **dict** Course API response object to fill subjects with descriptions for
+        :return:
+        """
+        for subject in subjects:
+            # find the description for this subject
+            result = self.db.MTRoyalSubjects.find_one({"subject": subject})
+
+            if result:
+                # remove unnecessary keys
+                del result["_id"]
+                del result["subject"]
+                del result["lastModified"]
+
+                # add the descriptions
+                subjects[subject]["description"] = result
+
+        return subjects
+
     def getSubjectListAll(self, term):
         """
         API Handler
@@ -228,7 +253,8 @@ class MTRoyal(threading.Thread):
             for teacher in classv["teachers"]:
                 if teacher not in distinctteachers:
                     distinctteachers.append(teacher)
-        
+
+        responsedict = self.retrieveSubjectDesc(responsedict)
         rmpobj = self.matchRMPNames(distinctteachers)
 
         # Send over a list of all the professors with a RMP rating in the list
@@ -289,7 +315,7 @@ class MTRoyal(threading.Thread):
 
                         # We dont want to present the terms that have "View Only" since users cant register in them
                         # anyways
-                        if "view only" not in termtext.lower():
+                        if "view only" not in termtext.lower() and "credit" in termtext.lower():
                             # add it to the dict
                             response_dict[termoption['value']] = termtext.strip()
                             dbtermdict["viewonly"] = False
@@ -369,6 +395,8 @@ class MTRoyal(threading.Thread):
         :return: **String** Class Page Text
         """
 
+        log.info("Obtaining term data for " + str(termid))
+
         postdata = "rsts=dummy" \
                    "&crn=dummy" \
                    "&term_in=" + str(termid) + \
@@ -432,7 +460,7 @@ class MTRoyal(threading.Thread):
         curgroupnum += 1
 
         # Check if this is a valid note structure
-        isValidNote = re.search("(\w[ \w]*) (\d*) take ([^.]*)", note)
+        isValidNote = re.search("(\w[ \w]*) (\d*) take ([^.;]*)", note)
 
         if isValidNote:
             notegroups = isValidNote.groups()
@@ -544,7 +572,8 @@ class MTRoyal(threading.Thread):
         :param termid: **int/string** Term ID that these classes belong to
         :return:
         """
-        log.info("\n\nNEW TERM  " + str(termid) + "\n\n")
+        log.info("Parsing term " + str(termid))
+
         classlist = BeautifulSoup(classlist, "lxml")
 
         # Get the table that has the classes
@@ -579,6 +608,9 @@ class MTRoyal(threading.Thread):
         lastClassCopy = {}
         courseClasses = []
         courseGroupings = {}
+
+        # Description fetching queue
+        q = Queue()
 
         for row in displaytable.findAll("tr"):
             title = row.find("th", {"class": "ddtitle"})
@@ -724,7 +756,8 @@ class MTRoyal(threading.Thread):
                         # push the classes to the db
                         #log.info(courseGroupings)
                         #log.info(courseClasses)
-                        self.addClasses(courseClasses, courseGroupings, termid)
+                        self.addClasses(courseClasses, courseGroupings, termid, q)
+
                         del courseClasses[:]
                         courseGroupings = {}
                         courseClasses.append(thisClass)
@@ -733,11 +766,20 @@ class MTRoyal(threading.Thread):
                     thisClass = {}
 
         # We need to add the very last course here
-        #log.info(courseGroupings)
-        #log.info(courseClasses)
-        self.addClasses(courseClasses, courseGroupings, termid)
+        self.addClasses(courseClasses, courseGroupings, termid, q)
 
-    def addClasses(self, classlist, groupings, term):
+        # Spawn threads to get the descriptions for courses
+        for i in range(self.settings["descConcurrency"]):
+            scaper = CourseDescriptions(q)
+            scaper.daemon = True
+            scaper.start()
+
+        # wait for the scrapers to finish the queue
+        q.join()
+
+        log.info("Finished parsing " + str(termid))
+
+    def addClasses(self, classlist, groupings, term, q):
         """
         Adds the given classes in classlist to the DB with the appropriate groupings
         :param classlist: **list** Contains dictionaries of class properties
@@ -780,16 +822,12 @@ class MTRoyal(threading.Thread):
             if not retrievingDesc:
                 # check whether we need to grab a description for this course
                 hasDesc = self.db.MTRoyalCourseDesc.find_one({"coursenum": thisclass["coursenum"],
-                                                              "subject": thisclass["subject"],
-                                                              "desc": {"$exists": True}})
+                                                              "subject": thisclass["subject"]})
 
                 if not hasDesc:
                     # We'll make a thread to try to retrieve the description for this course
                     retrievingDesc = True
-
-                    descthread = CourseDescriptions(thisclass["coursenum"], thisclass["subject"], thistitle)
-                    descthread.setDaemon(True)
-                    descthread.start()
+                    q.put([thisclass["coursenum"], thisclass["subject"], thistitle])
 
     def updateSubjects(self, subjects):
         """
@@ -826,32 +864,32 @@ class MTRoyal(threading.Thread):
         if self.settings["scrape"]:
             while True:
 
-                try:
-                    log.info("Scraping now")
-                    if self.login():
-                        # Get the terms
-                        terms = self.obtainActiveTerms()
+                #try:
+                log.info("Scraping now")
+                if self.login():
+                    # Get the terms
+                    terms = self.obtainActiveTerms()
 
-                        log.debug(terms)
+                    log.debug(terms)
 
-                        if terms:
-                            for term in terms:
-                                # Get the subjects
-                                termsubjects = self.getSubjectsForTerm(term)
+                    if terms:
+                        for term in terms:
+                            # Get the subjects
+                            termsubjects = self.getSubjectsForTerm(term)
 
-                                if termsubjects is not False:
-                                    # Update the DB listings for the subjects
-                                    self.updateSubjects(termsubjects)
+                            if termsubjects is not False:
+                                # Update the DB listings for the subjects
+                                self.updateSubjects(termsubjects)
 
-                                    # Get the class data for the previous subjects
-                                    classdata = self.getTermClasses(term, termsubjects)
+                                # Get the class data for the previous subjects
+                                classdata = self.getTermClasses(term, termsubjects)
 
-                                    # If we got class data, parse it
-                                    if classdata:
-                                        self.parseClassList(classdata, term)
+                                # If we got class data, parse it
+                                if classdata:
+                                    self.parseClassList(classdata, term)
 
-                except Exception as e:
-                    log.critical("Exception | " + str(e))
+                #except Exception as e:
+                    #log.critical("Exception | " + str(e))
 
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
@@ -867,7 +905,7 @@ class CourseDescriptions(threading.Thread):
     mainpage = "http://www.ucalgary.ca/pubs/calendar/current/"
     fullname = ""  # full name of the subject (CPSC = Computer Science)
 
-    def __init__(self, coursenum, subject, title):
+    def __init__(self, q):
         """
         Constructor for retrieving course descriptions
 
@@ -878,22 +916,21 @@ class CourseDescriptions(threading.Thread):
         """
         threading.Thread.__init__(self)
         self.db = pymongo.MongoClient().ScheduleStorm
-        self.coursenum = coursenum
-        self.subject = subject
-        self.title = title
+        self.q = q
 
-    def run(self):
-        urlfetch = "http://www.mtroyal.ca/ProgramsCourses/CourseListings/" \
-                   + self.subject.lower() + self.coursenum + ".htm"
+    def processBody(self, data, body, error):
+        """
+        Processes the body text for a given course description and data
+        :param data: **list** [coursenum, subject, title]
+        :param body: **String** HTML of the page
+        :return:
+        """
+        # setup the obj
+        descobj = {"subject": data[1], "coursenum": data[0], "name": data[2]}
 
-        # get the description page
-        r = requests.get(urlfetch)
-
-        if "page not found" not in r.text and r.status_code == requests.codes.ok:
-            # setup the obj
-            descobj = {"subject": self.subject, "coursenum": self.coursenum, "name": self.title}
-
-            soup = BeautifulSoup(r.text, "lxml")
+        # If we didn't encounter any errors with the request, we can process the body
+        if not error:
+            soup = BeautifulSoup(body, "lxml")
 
             # index for the different rows on the page
             index = 0
@@ -939,15 +976,39 @@ class CourseDescriptions(threading.Thread):
 
                         index += 1
 
+        # Upsert the updated description into the DB
+        self.db.MTRoyalCourseDesc.update(
+            {"coursenum": descobj["coursenum"], "subject": descobj["subject"]},
+            {
+                "$set": descobj,
+                "$currentDate": {"lastModified": True}
+            },
+            upsert=True
+        )
 
-            log.debug(descobj)
+    def run(self):
+        while not self.q.empty():
+            # get the data from the queue
+            data = self.q.get()
 
-            # Upsert the updated description into the DB
-            self.db.MTRoyalCourseDesc.update(
-                {"coursenum": descobj["coursenum"], "subject": descobj["subject"]},
-                {
-                    "$set": descobj,
-                    "$currentDate": {"lastModified": True}
-                },
-                upsert=True
-            )
+            if data:
+                log.info("Fetching course descriptions for " + data[1] + " " + data[0])
+                try:
+                    urlfetch = "http://www.mtroyal.ca/ProgramsCourses/CourseListings/" \
+                               + data[1].lower() + data[0] + ".htm"
+
+                    # fetch it
+                    r = requests.get(urlfetch)
+                    error = False
+
+                    if "page not found" in r.text or r.status_code != requests.codes.ok:
+                        error = True
+
+                    self.processBody(data, r.text, error)
+                except:
+                    log.error("Couldn't fetch description for " + data[1] + " " + data[0])
+
+                self.q.task_done()
+            else:
+                # we're done
+                break
