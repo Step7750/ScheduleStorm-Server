@@ -231,4 +231,8 @@ Class Objects are dictionaries with the specified keys
 | teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]. If there are no teachers, set it to ["TBA"] or ["N/A"]
 | type      | string | No       | No     | Type of the class (ex. "LEC")
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
+| group     | string | No       | No     | Group of this class. If another class with the same coursenum and subject yet different type and has the same group value, the two classes can be taken together. (ex. "1")
+| status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
+| section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
+
