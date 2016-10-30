@@ -212,3 +212,20 @@ Arguments:
 | subject   | string | No       | Subject abbreviation of the description to obtain (ex. "CPSC")
 
 Returns: Course Description object of the specified coursenum and subject if successful, False if not
+
+
+# Classes
+
+## Class Object
+Class Objects are dictionaries with the specified keys
+
+| key       | Type   | Optional | Unique | Notes
+| --------- | ------ | -------- | ------ | ------ |
+| id        | int    | No       | Yes    | ID of the class (ex. "34534")
+| subject   | string | No       | No     | Subject abbreviation (ex. "CPSC")
+| coursenum | string | No       | No     | Course number of the description to obtain (ex. "300")
+| rooms     | list   | No       | No     | List of strings that contain the rooms that this class is situated in (ex. ["MFH 164", "HEH 101"]. If there are no rooms, set it to ["TBA"] or ["N/A"]
+| teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]. If there are no teachers, set it to ["TBA"] or ["N/A"]
+| type      | string | No       | No     | Type of the class (ex. "LEC")
+| times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
+| restriction | bool | Yes      | No     | True if this class has a restriction to some students
