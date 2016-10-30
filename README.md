@@ -293,3 +293,25 @@ Arguments:
 
 Updates the class specified into the DB. If the class doesn't exist in the DB yet, it is inserted.
 
+
+# General Tips When Adding a University
+
+* Don't use print statements, the `University` superclass contains a [`logger`](https://docs.python.org/3.5/library/logging.html#logger-objects), you can use it with `self.log`
+	* Examples
+		* `self.log.error("You can't do this")`
+		* `self.log.info("Scraping courses")`
+* You can access your uni settings object with `self.settings` within the uni class
+* Add a `scrapeinterval` in your settings file and add a delay between successful scraping sessions using `time.sleep(self.settings["scrapeinterval"]`
+* Look at `Example.py` for a starting point, make sure you edit the settings file though!
+* If you want to add more attributes to a class/subject/term/coursedesc object, go ahead! They won't be used by the front-end, but we can add support for it later on!
+* If you have any questions/concerns, feel free to file an issue or talk to us!
+
+# Authors
+* Stepan Fedorko-Bartos - [Email](mailto:stepan.fedorkobartos@ucalgary.ca), [Github](https://github.com/step7750), [LinkedIn](https://linkedin.com/in/step7750)
+* Ceegan Hale - [Email](mailto:ceeganhale@gmail.com), [Github](https://github.com/per-plex), [LinkedIn](https://www.linkedin.com/in/ceegan-hale-64a4a9128)
+* Thanks to any contributors!
+
+## Inspiration from:
+
+* [Hey Winston for University of Alberta](https://github.com/ahoskins/winston)
+
