@@ -21,6 +21,7 @@ uniThreads = {}
 
 # Logging
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 log = logging.getLogger("main")
 logging.getLogger("requests").setLevel(logging.WARNING)
 logging.getLogger("wsgiref").setLevel(logging.WARNING)
@@ -74,6 +75,8 @@ if __name__ == '__main__':
         # Get the settings
         unisettings = settings["Universities"][university]
 
+        # Set the key
+        unisettings["uniID"] = university
 
         # Only instantiate if they have it enabled in settings
         if "enabled" in unisettings and unisettings["enabled"]:
