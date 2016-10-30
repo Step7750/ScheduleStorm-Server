@@ -61,13 +61,13 @@ The sid parameter is the school ID, thus, this RMP ID is 1416.
 
 # Creating Your University Python File
 
-### File Name
+## File Name
 
 **All of the universities are located in the "uni" folder with their names being \<uniID\>.py**
 
 For example: University of Calgary has a uniID of "UCalgary" in the settings file, so its file is UCalgary.py.
 
-### Creating the Class
+## Creating the Class
 
 Each university inherits the University class, which inherits the threading.Thread class. 
 
@@ -103,10 +103,10 @@ Since each university inherits the `University` superclass, all interaction with
 ## Term Object
 Term Objects are dictionaries with the specified keys
 
-| key       | Type   | Optional | Notes
-| --------- | ------ | -------- | ------ |
-| id        | string | No       | Unique ID of the Term (ex. "20235")
-| name      | string | No       | Name of the term (ex. "Fall 2016")
+| key       | Type   | Optional | Unique | Notes
+| --------- | ------ | -------- | ------ | ------ |
+| id        | string | No       | Yes    | ID of the Term (ex. "20235")
+| name      | string | No       | No     | Name of the term (ex. "Fall 2016")
 
 Within the DB, it also contains an enabled flag that specifies whether it is shown to users or not. The Term methods abstract this from you.
 
@@ -121,7 +121,7 @@ Arguments:
 
 **NOTE: This sets the only enabled terms to be the specified terms in the list**
 
-Updates the terms specified into the DB. If the term doesn't exist in the DB yet, it is inserted.
+Updates the terms specified into the DB. If a term doesn't exist in the DB yet, it is inserted.
 
 ### `updateTerm(dict term)`
 Arguments:
@@ -144,3 +144,35 @@ Returns: Term object for the specified termid if succesful, False if not
 ### `resetEnabledTerms()`
 
 Sets every term within the DB to have a `False` enabled flag (isn't shown to users).
+
+# Subjects
+
+## Subject Object
+Subject Objects are dictionaries with the specified keys
+
+| key       | Type   | Optional | Unique | Notes
+| --------- | ------ | -------- | ------ | ------ |
+| subject   | string | No       | Yes    | Subject abbreviation (ex. CPSC)
+| name      | string | No       | No     | Subject name (ex. Computer Science)
+| faculty   | string | Yes      | No     | Faculty that this subject belongs to (ex. Faculty of Science)
+
+## Subject Methods
+
+### `updateSubjects(list subjects)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| subjects  | list   | No       | List of subject objects to update in the DB
+
+Updates the subjects specified into the DB. If a subject doesn't exist in the DB yet, it is inserted.
+
+### `updateSubject(dict subject)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| subject   | dict   | No       | Subject object to update in the DB
+
+Updates the subject specified into the DB. If the subject doesn't exist in the DB yet, it is inserted.
+
