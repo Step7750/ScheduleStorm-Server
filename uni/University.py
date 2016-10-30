@@ -45,6 +45,12 @@ class University(threading.Thread):
             ("uni", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.ClassList.create_index([
+            ("id", pymongo.ASCENDING),
+            ("term", pymongo.ASCENDING),
+            ("uni", pymongo.ASCENDING)],
+            unique=True)
+
     def getLocations(self):
         """
         API Handler
@@ -158,6 +164,23 @@ class University(threading.Thread):
                 },
                 upsert=True
             )
+
+    def courseHasDescription(self, coursenum, subject):
+        """
+        Returns whether the given course has a description or not
+
+        :param coursenum: **string** Number of the course (ex. 545A or 545)
+        :param subject: **string** Subject code (ex. CPSC)
+        :return: **obj/boolean** Description obj if the course has a description, False is not
+        """
+        return self.db.CourseDesc.find_one(
+            {
+                "coursenum": coursenum,
+                "subject": subject,
+                "uni": self.settings["uniID"]
+            }
+        )
+
 
     def updateSubject(self, subject):
         """
