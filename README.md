@@ -273,5 +273,23 @@ Each time for a given class must be in the specified format:
 	* "MoWeFr 9:00AM - 11:00AM"
 	* "MoTWe 2:00PM - 3:00PM"
 
+## Class Methods
 
+### `updateClasses(list classes)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| classes   | list   | No       | List of class objects to update
+
+Updates the classes specified into the DB. If a class doesn't exist in the DB yet, it is inserted.
+
+### `updateClass(dict class)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| class     | dict   | No       | Class object to update
+
+Updates the class specified into the DB. If the class doesn't exist in the DB yet, it is inserted.
 
