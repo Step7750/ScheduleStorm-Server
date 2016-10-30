@@ -53,7 +53,7 @@ class University(threading.Thread):
 
         :return: **list** Distinct locations for this university
         """
-        locations = self.db.CourseList.distinct("location", {"uni": self.settings["uniID"]})
+        locations = self.db.ClassList.distinct("location", {"uni": self.settings["uniID"]})
         response = []
 
         for location in locations:
@@ -174,7 +174,7 @@ class University(threading.Thread):
             # Update the subject data in the DB
             self.db.Subjects.update(
                 {
-                    "subject": subjectdict["subject"],
+                    "subject": subject["subject"],
                     "uni": subject["uni"]
                 },
                 {
@@ -188,11 +188,57 @@ class University(threading.Thread):
         """
         Upserts a given list of subjects into the DB
 
-        :param subject: **list** List of subject objects to upsert
+        :param subjects: **list** List of subject objects to upsert
         :return:
         """
         for subject in subjects:
             self.updateSubject(subject)
+
+    def updateClass(self, classobj):
+        """
+        Upserts the given class into the DB
+
+        :param classobj: **dict** Attributes of class to insert into the DB
+        :return:
+        """
+        requiredKeys = ["id", "group", "location", "rooms", "status", "teachers", "term", "times", "type"]
+        hasAllKeys = True
+
+        # Make sure it has each key
+        for key in requiredKeys:
+            if key not in classobj:
+                hasAllKeys = False
+                break
+
+        if not hasAllKeys:
+            self.log.critical("The following class doesn't have all of the required keys, please refer to API docs: "
+                              + str(classobj))
+        else:
+            # upsert the class to the DB
+            classobj["uni"] = self.settings["uniID"]
+
+            self.db.ClassList.update(
+                {
+                    "id": classobj["id"],
+                    "term": classobj["term"],
+                    "uni": classobj["uni"]
+                },
+                {
+                    "$set": classobj,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
+
+    def updateClasses(self, classes):
+        """
+        Upserts many classes into the DB
+
+        :param classes: **list** Of class dicts
+        :return:
+        """
+        for classobj in classes:
+            self.updateClass(classobj)
 
     def run(self):
         self.log.critical("You must overwrite the run method for " + self.settings["uniID"])
