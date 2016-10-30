@@ -189,9 +189,10 @@ Course Description Objects are dictionaries with the specified keys
 | desc      | string | Yes      | No     | Description of the course (ex. "You'll learn about computers in this course")
 | units     | int    | Yes      | No     | How many units this course is worth (ex. 3)
 | hours     | string | Yes      | No     | Distribution of hours between types of classes (ex. "H(3-3)")
-| prereq    | string | Yes      | No     | Sentence containing course prerequisites (ex. "Must take CPSC 299 or CPSC 256")
-| coreq     | string | Yes      | No     | Sentence containing course corequisites (ex. "Must take CPSC 301 with this course")
-| antireq   | string | Yes      | No     | Sentence containing course antirequisites (ex. "Student must not have taken CPSC 302")
+| prereq    | string | Yes      | No     | Human-readable course prerequisites (ex. "Must take CPSC 299 or CPSC 256")
+| coreq     | string | Yes      | No     | Human-readable course corequisites (ex. "Must take CPSC 301 with this course")
+| antireq   | string | Yes      | No     | Human-readable course antirequisites (ex. "Student must not have taken CPSC 302")
+| notes     | string | Yes      | No     | Any further human-readable notes for this class (ex. "You might learn too much!")
 
 The coursenum and subject fields together form a unique constraint.
 
@@ -236,4 +237,41 @@ Class Objects are dictionaries with the specified keys
 | status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
 | section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
+
+### Time Formatting
+
+Each time for a given class must be in the specified format:
+
+### `<DaysOfTheWeek> <StartTime><AM/PM> - <EndTime><AM/PM>`
+
+* Days of the Week
+	* Concatenated series of days in which this time is applicable
+	* Possible Days
+		* M/Mo - Monday
+		* T/Tu - Tuesday
+		* W/We - Wednesday
+		* R/Th - Thursday
+		* F/Fr - Friday
+		* S/Sa - Saturday 
+		* U/Su - Sunday
+	* Examples
+		* "M"
+		* "MTR"
+		* "FWM"
+	* Order of the days does not matter
+
+* StartTime/EndTime
+	* 12-hour Start/End time
+	* Format: `<Hour>:<Minutes>`
+	* Examples
+		* "12:00"
+		* "1:23"
+
+* Examples
+	* "TR 12:00PM - 1:20PM"
+	* "MWF 9:50AM - 10:30AM"
+	* "MoWeFr 9:00AM - 11:00AM"
+	* "MoTWe 2:00PM - 3:00PM"
+
+
 
