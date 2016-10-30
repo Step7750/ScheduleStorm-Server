@@ -189,6 +189,9 @@ Course Description Objects are dictionaries with the specified keys
 | desc      | string | Yes      | No     | Description of the course (ex. "You'll learn about computers in this course")
 | units     | int    | Yes      | No     | How many units this course is worth (ex. 3)
 | hours     | string | Yes      | No     | Distribution of hours between types of classes (ex. "H(3-3)")
+| prereq    | string | Yes      | No     | Sentence containing course prerequisites (ex. "Must take CPSC 299 or CPSC 256")
+| coreq     | string | Yes      | No     | Sentence containing course corequisites (ex. "Must take CPSC 301 with this course")
+| antireq   | string | Yes      | No     | Sentence containing course antirequisites (ex. "Student must not have taken CPSC 302")
 
 The coursenum and subject fields together form a unique constraint.
 
