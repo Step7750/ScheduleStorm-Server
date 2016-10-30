@@ -14,11 +14,12 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 
 1. Settings File
 2. Creating Your University Python File
-3. Adding Terms to the DB
-4. Adding Course Descriptions to the DB
-5. Adding Classes to the DB
+3. Terms
+4. Subjects
+5. Course Descriptions
+6. Classes
 
-## Settings File
+# Settings File
 
 Using the settings file, you can tell Schedule Storm your University's rmpid, api key, username, password, etc...
 
@@ -58,7 +59,7 @@ Afterwards, you will be forwarded to a URL such as: http://www.ratemyprofessors.
 The sid parameter is the school ID, thus, this RMP ID is 1416.
 
 
-## Creating Your University Python File
+# Creating Your University Python File
 
 ### File Name
 
@@ -95,11 +96,11 @@ class UCalgary(University):
 
 It is highly recommended that you set a scraping interval within your settings file to pause the scraping every X seconds after it is finished before scraping again.
 
-## Adding Terms to the DB
+# Terms
 
 Since each university inherits the `University` superclass, all interaction with the MongoDB database is done through it. You can use the following methods to interface with the terms.
 
-### Term Object
+## Term Object
 Term Objects are dictionaries with the specified keys
 
 | key       | Type   | Optional | Notes
