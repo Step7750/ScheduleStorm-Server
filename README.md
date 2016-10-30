@@ -31,7 +31,9 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
         "<uniID>": {
             "fullname": "<University Name>"
             "enabled": true,
-            "rmpid": <rmpid>
+	    "scrape": true,
+            "rmpid": <rmpid>,
+	    ...
         },
 	...
 ```
@@ -41,6 +43,7 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 | uniID     | string | No       | ID/Abbreviation of the University (ex. UCalgary, MTRoyal)
 | fullname  | string | No       | Full name of the university shown to the user (ex. University of Calgary)
 | enabled   | bool   | No       | Boolean as to whether this university is enabled or not
+| scrape    | bool   | No       | If true, runs the university thread to fetch updated course info
 | rmpid     | int    | Yes      | RMP ID of the University to fetch professor data from
 
 
