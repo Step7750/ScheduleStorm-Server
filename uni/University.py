@@ -21,6 +21,7 @@ class University(threading.Thread):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
         self.log = logging.getLogger(self.settings["uniID"])
+        self.ensureIndexes()
 
     def ensureIndexes(self):
         """
@@ -30,6 +31,17 @@ class University(threading.Thread):
         """
         self.db.Terms.create_index([
             ("term", pymongo.ASCENDING),
+            ("uni", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.CourseDesc.create_index([
+            ("coursenum", pymongo.ASCENDING),
+            ("subject", pymongo.ASCENDING),
+            ("uni", pymongo.ASCENDING)],
+            unique=True)
+
+        self.db.Subjects.create_index([
+            ("subject", pymongo.ASCENDING),
             ("uni", pymongo.ASCENDING)],
             unique=True)
 
@@ -122,6 +134,65 @@ class University(threading.Thread):
         :return: **obj/bool** Term Obj is succesful, False is not
         """
         return self.db.Terms.find_one({"uni": self.settings["uniID"], "id": str(termid)})
+
+    def updateCourseDesc(self, coursedesc):
+        """
+        Upserts the given course description object into the DB
+
+        :param coursedesc: **dict** Object to insert into the DB
+        :return:
+        """
+        if "subject" not in coursedesc or "coursenum" not in coursedesc:
+            self.log.critical("Course description doesn't have both subject and coursenum keys")
+        else:
+            coursedesc["uni"] = self.settings["uniID"]
+            self.db.CourseDesc.update(
+                {
+                    "coursenum": coursedesc["coursenum"],
+                    "subject": coursedesc["subject"],
+                    "uni": coursedesc["uni"]
+                },
+                {
+                    "$set": coursedesc,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
+
+    def updateSubject(self, subject):
+        """
+        Upserts a given subject into the DB
+
+        :param subject: **dict** Keys are the subject codes, values are the names
+        :return:
+        """
+        if "subject" not in subject or "name" not in subject:
+            self.log.critical("Subject doesn't contain both the name and it's subject")
+        else:
+            subject["uni"] = self.settings["uniID"]
+
+            # Update the subject data in the DB
+            self.db.Subjects.update(
+                {
+                    "subject": subjectdict["subject"],
+                    "uni": subject["uni"]
+                },
+                {
+                    "$set": subject,
+                    "$currentDate": {"lastModified": True}
+                },
+                upsert=True
+            )
+
+    def updateSubjects(self, subjects):
+        """
+        Upserts a given list of subjects into the DB
+
+        :param subject: **list** List of subject objects to upsert
+        :return:
+        """
+        for subject in subjects:
+            self.updateSubject(subject)
 
     def run(self):
         self.log.critical("You must overwrite the run method for " + self.settings["uniID"])
