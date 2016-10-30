@@ -153,7 +153,7 @@ Subject Objects are dictionaries with the specified keys
 | key       | Type   | Optional | Unique | Notes
 | --------- | ------ | -------- | ------ | ------ |
 | subject   | string | No       | Yes    | Subject abbreviation (ex. CPSC)
-| name      | string | No       | No     | Subject name (ex. Computer Science)
+| name      | string | Yes      | No     | Subject name (ex. Computer Science)
 | faculty   | string | Yes      | No     | Faculty that this subject belongs to (ex. Faculty of Science)
 
 ## Subject Methods
@@ -176,3 +176,39 @@ Arguments:
 
 Updates the subject specified into the DB. If the subject doesn't exist in the DB yet, it is inserted.
 
+# Course Descriptions
+
+## Course Description Object
+Course Description Objects are dictionaries with the specified keys
+
+| key       | Type   | Optional | Unique | Notes
+| --------- | ------ | -------- | ------ | ------ |
+| coursenum | string | No       | No     | Course number (ex. "300")
+| subject   | string | No       | No     | Subject abbreviation (ex. "CPSC")
+| name      | string | Yes      | No     | Name/title of the course (ex. "Introduction to Computer Science")
+| desc      | string | Yes      | No     | Description of the course (ex. "You'll learn about computers in this course")
+| units     | int    | Yes      | No     | How many units this course is worth (ex. 3)
+| hours     | string | Yes      | No     | Distribution of hours between types of classes (ex. "H(3-3)")
+
+The coursenum and subject fields together form a unique constraint.
+
+## Course Description Methods
+
+### `updateCourseDesc(dict coursedesc)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| coursedesc | dict   | No       | Course description object to update in the DB
+
+Updates the course description specified into the DB. If the course description doesn't exist in the DB yet, it is inserted.
+
+### `getCourseDescription(string coursenum, string subject)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| coursenum | string | No       | Course number of the description to obtain (ex. "300")
+| subject   | string | No       | Subject abbreviation of the description to obtain (ex. "CPSC")
+
+Returns: Course Description object of the specified coursenum and subject if successful, False if not
