@@ -188,8 +188,8 @@ class University(threading.Thread):
         :param subject: **dict** Keys are the subject codes, values are the names
         :return:
         """
-        if "subject" not in subject or "name" not in subject:
-            self.log.critical("Subject doesn't contain both the name and it's subject")
+        if "subject" not in subject:
+            self.log.critical("Subject object doesn't contain the subject key")
         else:
             subject["uni"] = self.settings["uniID"]
 
