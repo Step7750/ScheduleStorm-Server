@@ -30,7 +30,7 @@ class University(threading.Thread):
         :return:
         """
         self.db.Terms.create_index([
-            ("term", pymongo.ASCENDING),
+            ("id", pymongo.ASCENDING),
             ("uni", pymongo.ASCENDING)],
             unique=True)
 
@@ -106,7 +106,7 @@ class University(threading.Thread):
 
         :return:
         """
-        self.db.Terms.update({"uni": self.settings["uniID"]}, {"$set": {"enabled": False}}, {"multi": True})
+        self.db.Terms.update({"uni": self.settings["uniID"]}, {"$set": {"enabled": False}}, upsert=False, multi=True)
 
     def updateTerm(self, term):
         """
@@ -165,7 +165,7 @@ class University(threading.Thread):
                 upsert=True
             )
 
-    def courseHasDescription(self, coursenum, subject):
+    def getCourseDescription(self, coursenum, subject):
         """
         Returns whether the given course has a description or not
 
@@ -180,7 +180,6 @@ class University(threading.Thread):
                 "uni": self.settings["uniID"]
             }
         )
-
 
     def updateSubject(self, subject):
         """
@@ -239,6 +238,8 @@ class University(threading.Thread):
         else:
             # upsert the class to the DB
             classobj["uni"] = self.settings["uniID"]
+            # force term to be a string
+            classobj["term"] = str(classobj["term"])
 
             self.db.ClassList.update(
                 {
@@ -263,5 +264,194 @@ class University(threading.Thread):
         for classobj in classes:
             self.updateClass(classobj)
 
+    def matchRMPNames(self, distinctteachers):
+        """
+        Given a list of teachers to match RMP data to, this function obtains all RMP data and tries to match the names
+        with the distinctteachers list and returns the matches
+
+        We first check whether the constructed name is simply the same in RMP
+        If not, we check whether the first and last words in a name in RMP is the same
+        If not, we check whether any first and last words in the teachers name has a result in RMP that starts
+            with the first and last words
+        If not, we give up and don't process the words
+
+        Most teachers should have a valid match using this method, many simply don't have a profile on RMP
+        Around 80%+ of valid teachers on RMP should get a match
+
+        False positives are possible, but highly unlikely given that it requires the first and last name of the
+        wrong person to start the same way
+
+        :param distinctteachers: **list** Distinct list of all teachers to find an RMP match for
+        :return: **dict** Matched teachers and their RMP ratings
+        """
+        # Get the RMP data for all teachers at UCalgary
+        rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
+
+        returnobj = {}
+
+        # We want to construct the names of each teacher and invert the results for easier parsing
+        # and better time complexity
+        rmpinverted = {}
+
+        for teacher in rmp:
+            # Construct the name
+            fullname = ""
+            if "firstname" in teacher:
+                fullname += teacher["firstname"]
+            if "middlename" in teacher:
+                fullname += " " + teacher["middlename"]
+            if "lastname" in teacher:
+                fullname += " " + teacher["lastname"]
+
+            # remove unnecessary fields
+            del teacher["_id"]
+            del teacher["lastModified"]
+            del teacher["school"]
+
+            rmpinverted[fullname] = teacher
+
+        # Iterate through each distinct teacher
+        for teacher in distinctteachers:
+            if teacher in rmpinverted:
+                # We found an instant match, add it to the return dict
+                returnobj[teacher] = rmpinverted[teacher]
+            else:
+                # Find the first and last words of the name
+                teacherNameSplit = teacher.split(" ")
+                lastword = teacherNameSplit[-1]
+                firstword = teacherNameSplit[0]
+
+                # Check to see if the first and last words find a match (without a middle name)
+                namewithoutmiddle = firstword + " " + lastword
+
+                if namewithoutmiddle in rmpinverted:
+                    # Found the match! Add an alias field
+                    returnobj[teacher] = rmpinverted[namewithoutmiddle]
+                else:
+                    # Find a teacher in RMP that had the first and last words of their name starting the
+                    # respective words in the original teacher's name
+                    for teacher2 in rmpinverted:
+                        splitname = teacher2.split(" ")
+                        first = splitname[0]
+                        last = splitname[-1]
+
+                        if lastword.startswith(last) and firstword.startswith(first):
+                            returnobj[teacher] = rmpinverted[teacher2]
+                            break
+
+        return returnobj
+
+    def retrieveSubjectDesc(self, courses):
+        """
+        Given a course list from an API handler, retrieves course descriptions and sorts by faculty if applicable
+
+        Pure Function
+
+        :param courses: **dict** List of courses from API handler
+        :return: **dict** Faculty (if applicable) sorted dict with course descriptions
+        """
+        response = {}
+
+        # Check if this Uni supports faculties
+        supportsFaculties = False
+
+        facultyCount = self.db.Subjects.find({"uni": self.settings["uniID"], "faculty": {"$exists": True}}).count()
+
+        if facultyCount > 0:
+            supportsFaculties = True
+        else:
+            # response doesn't have faculties, so it has the same structure as courses
+            response = courses
+
+        # Get the descriptions for each subject
+        for subject in courses:
+            result = self.db.Subjects.find_one({"subject": subject, "uni": self.settings["uniID"]})
+
+            if result:
+                del result["_id"]
+                del result["subject"]
+                del result["lastModified"]
+
+                if supportsFaculties:
+                    if "faculty" not in result:
+                        result["faculty"] = "Other"
+
+                    if result["faculty"] not in response:
+                        response[result["faculty"]] = {}
+
+                    response[result["faculty"]][subject] = courses[subject]
+
+                    response[result["faculty"]][subject]["description"] = result
+                else:
+                    response[subject]["description"] = result
+
+        return response
+
+    def getSubjectListAll(self, term):
+        """
+        API Handler
+
+        Returns all data for a given term (classes, descriptions and RMP)
+
+        :param term: **string/int** ID of the term
+        :return: **dict** All data for the term
+        """
+        responsedict = {}
+
+        classes = self.db.ClassList.find({"term": term, "uni": self.settings["uniID"]})
+
+        distinctteachers = []
+
+        # Parse each class and get their descriptions
+        for classv in classes:
+            del classv["_id"]
+
+            if classv["subject"] not in responsedict:
+                responsedict[classv["subject"]] = {}
+
+            if classv["coursenum"] not in responsedict[classv["subject"]]:
+                responsedict[classv["subject"]][classv["coursenum"]] = {"classes": []}
+
+            subj = classv["subject"]
+            coursen = classv["coursenum"]
+
+            # Get the class description
+            if "description" not in responsedict[subj][coursen]:
+                result = self.getCourseDescription(coursen, subj)
+
+                if result:
+                    # Remove unneeded fields
+                    del result["_id"]
+                    del result["subject"]
+                    del result["coursenum"]
+                    del result["lastModified"]
+
+                    responsedict[subj][coursen]["description"] = result
+                else:
+                    responsedict[subj][coursen]["description"] = False
+
+            # Remove unneeded fields
+            del classv["subject"]
+            del classv["coursenum"]
+            del classv["lastModified"]
+
+            # Add this class to the course list
+            responsedict[subj][coursen]["classes"].append(classv)
+
+            # Find distinct teachers and append them to distinctteachers
+            for teacher in classv["teachers"]:
+                if teacher not in distinctteachers and teacher != "Staff":
+                    distinctteachers.append(teacher)
+
+
+        # Add the faculty sorting and course descriptions
+        responsedict = self.retrieveSubjectDesc(responsedict)
+
+        # Match RMP data
+        rmpobj = self.matchRMPNames(distinctteachers)
+
+        # Send over a list of all the professors with a RMP rating in the list
+        return {"classes": responsedict, "rmp": rmpobj}
+
     def run(self):
-        self.log.critical("You must overwrite the run method for " + self.settings["uniID"])
+        self.log.critical("You must overwrite the run method")

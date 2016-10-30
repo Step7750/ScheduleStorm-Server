@@ -7,7 +7,6 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 """
 
 import threading
-import pymongo
 from bs4 import BeautifulSoup
 import time
 import logging
@@ -15,14 +14,18 @@ import requests
 from datetime import datetime
 import re
 from queue import Queue
-import json
+import traceback
+from .University import University
 
 
 log = logging.getLogger("MTRoyal")
 verifyRequests = False
 
 
-class MTRoyal(threading.Thread):
+class MTRoyal(University):
+    """
+    Implements MTRoyal course retrieval
+    """
 
     instructionTypes = {
         "LEC": "LECTURE",
@@ -38,227 +41,10 @@ class MTRoyal(threading.Thread):
     }
 
     def __init__(self, settings):
-        threading.Thread.__init__(self)
-        self.settings = settings
+        super().__init__(settings)
+
         self.loginSession = requests.session()
-        self.db = pymongo.MongoClient().ScheduleStorm
         self.invertedTypes = {v: k for k, v in self.instructionTypes.items()}
-
-        log.info("Ensuring indexes exist...")
-
-        self.db.MTRoyalCourseList.create_index([
-            ("id", pymongo.ASCENDING),
-            ("term", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.MTRoyalCourseDesc.create_index([
-            ("coursenum", pymongo.ASCENDING),
-            ("subject", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.MTRoyalSubjects.create_index([
-            ("subject", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.MTRoyalTerms.create_index([
-            ("term", pymongo.ASCENDING)],
-            unique=True)
-
-    def getTerms(self):
-        """
-        API Handler
-
-        Returns the distinct terms in the database, along with their name and id
-
-        :return: **dict** Keys are the ids, values are the proper names
-        """
-        termlist = self.db.MTRoyalTerms.find({"viewonly": False})
-
-        responsedict = {}
-
-        for term in termlist:
-            responsedict[term["term"]] = term["name"]
-
-        return responsedict
-
-    def getLocations(self):
-        """
-        API Handler
-
-        Returns a list of all locations at UCalgary
-
-        :return: **list** Contains 1D with the possible locations
-        """
-        locations = self.db.MTRoyalCourseList.distinct("location")
-        response = []
-
-        for location in locations:
-            if location != "":
-                response.append(location)
-
-        return response
-
-    def matchRMPNames(self, distinctteachers):
-        """
-        Given a list of teachers to match RMP data to, this function obtains all RMP data and tries to match the names
-        with the distinctteachers list and returns the matches
-
-        We first check whether the constructed name is simply the same in RMP
-        If not, we check whether the first and last words in a name in RMP is the same
-        If not, we check whether any first and last words in the teachers name has a result in RMP that starts
-            with the first and last words
-        If not, we give up and don't process the words
-
-        Most teachers should have a valid match using this method, many simply don't have a profile on RMP
-        Around 80%+ of valid teachers on RMP should get a match
-
-        False positives are possible, but highly unlikely given that it requires the first and last name of the
-        wrong person to start the same way
-
-        :param distinctteachers: **list** Distinct list of all teachers to find an RMP match for
-        :return: **dict** Matched teachers and their RMP ratings
-        """
-        # Get the RMP data for all teachers at UCalgary
-        rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
-
-        returnobj = {}
-
-        # We want to construct the names of each teacher and invert the results for easier parsing
-        # and better time complexity
-        rmpinverted = {}
-
-        for teacher in rmp:
-            # Construct the name
-            fullname = ""
-            if "firstname" in teacher:
-                fullname += teacher["firstname"]
-            if "middlename" in teacher:
-                fullname += " " + teacher["middlename"]
-            if "lastname" in teacher:
-                fullname += " " + teacher["lastname"]
-
-            # remove unnecessary fields
-            del teacher["_id"]
-            del teacher["lastModified"]
-            del teacher["school"]
-
-            rmpinverted[fullname] = teacher
-
-        # Iterate through each distinct teacher
-        for teacher in distinctteachers:
-            if teacher in rmpinverted:
-                # We found an instant match, add it to the return dict
-                returnobj[teacher] = rmpinverted[teacher]
-            else:
-                # Find the first and last words of the name
-                teacherNameSplit = teacher.split(" ")
-                lastword = teacherNameSplit[-1]
-                firstword = teacherNameSplit[0]
-
-                # Check to see if the first and last words find a match (without a middle name)
-                namewithoutmiddle = firstword + " " + lastword
-
-                if namewithoutmiddle in rmpinverted:
-                    # Found the match! Add an alias field
-                    returnobj[teacher] = rmpinverted[namewithoutmiddle]
-                else:
-                    # Find a teacher in RMP that had the first and last words of their name starting the
-                    # respective words in the original teacher's name
-                    for teacher2 in rmpinverted:
-                        splitname = teacher2.split(" ")
-                        first = splitname[0]
-                        last = splitname[-1]
-
-                        if lastword.startswith(last) and firstword.startswith(first):
-                            returnobj[teacher] = rmpinverted[teacher2]
-                            break
-
-        return returnobj
-
-    def retrieveSubjectDesc(self, subjects):
-        """
-        Given a subject dict, retrieves the description for each subject
-
-        Note: We weren't able to find reliable Faculty information, thus the first depth level is subjects
-
-        :param subjects: **dict** Course API response object to fill subjects with descriptions for
-        :return:
-        """
-        for subject in subjects:
-            # find the description for this subject
-            result = self.db.MTRoyalSubjects.find_one({"subject": subject})
-
-            if result:
-                # remove unnecessary keys
-                del result["_id"]
-                del result["subject"]
-                del result["lastModified"]
-
-                # add the descriptions
-                subjects[subject]["description"] = result
-
-        return subjects
-
-    def getSubjectListAll(self, term):
-        """
-        API Handler
-
-        Returns all data for a given term (classes, descriptions and RMP)
-
-        :param term: **string/int** ID of the term
-        :return: **dict** All data for the term
-        """
-        responsedict = {}
-
-        classes = self.db.MTRoyalCourseList.find({"term": int(term)})
-        distinctteachers = []
-
-        # Parse each class and get their descriptions
-        for classv in classes:
-            del classv["_id"]
-
-            if classv["subject"] not in responsedict:
-                responsedict[classv["subject"]] = {}
-
-            if classv["coursenum"] not in responsedict[classv["subject"]]:
-                responsedict[classv["subject"]][classv["coursenum"]] = {"classes": []}
-
-            subj = classv["subject"]
-            coursen = classv["coursenum"]
-
-            # Get the class description
-            if "description" not in responsedict[subj][coursen]:
-                result = self.db.MTRoyalCourseDesc.find_one({"coursenum": coursen, "subject": subj})
-
-                if result:
-                    # Remove unneeded fields
-                    del result["_id"]
-                    del result["subject"]
-                    del result["coursenum"]
-                    del result["lastModified"]
-
-                    responsedict[subj][coursen]["description"] = result
-                else:
-                    responsedict[subj][coursen]["description"] = False
-
-            # Remove unneeded fields
-            del classv["subject"]
-            del classv["coursenum"]
-            del classv["lastModified"]
-
-            # Add this class to the course list
-            responsedict[subj][coursen]["classes"].append(classv)
-
-            # Find distinct teachers and append them to distinctteachers
-            for teacher in classv["teachers"]:
-                if teacher not in distinctteachers:
-                    distinctteachers.append(teacher)
-
-        responsedict = self.retrieveSubjectDesc(responsedict)
-        rmpobj = self.matchRMPNames(distinctteachers)
-
-        # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": responsedict, "rmp": rmpobj}
 
     def login(self):
         """
@@ -299,6 +85,8 @@ class MTRoyal(threading.Thread):
 
             response_dict = {}
 
+            enabledTerms = []
+
             for termoption in  soup.find("select", {"name": "p_term"}).findAll("option"):
                 log.debug("Processing " + termoption['value'])
 
@@ -308,7 +96,7 @@ class MTRoyal(threading.Thread):
                     # We want this year or next year in the text (don't want old terms)
                     thisyear = datetime.now().year
 
-                    dbtermdict = {"term": termoption['value'], "name": termtext.strip(), "viewonly": True}
+                    dbtermdict = {"id": termoption['value'], "name": termtext.strip(), "enabled": False}
 
                     if str(thisyear) in termtext or str(thisyear+1) in termtext:
                         log.debug(termtext + " is within this year or the next")
@@ -318,17 +106,11 @@ class MTRoyal(threading.Thread):
                         if "view only" not in termtext.lower() and "credit" in termtext.lower():
                             # add it to the dict
                             response_dict[termoption['value']] = termtext.strip()
-                            dbtermdict["viewonly"] = False
+                            dbtermdict["enabled"] = True
+                            enabledTerms.append(dbtermdict)
 
-                    # Update the term data in the DB
-                    self.db.MTRoyalTerms.update(
-                        {"term": dbtermdict["term"]},
-                        {
-                            "$set": dbtermdict,
-                            "$currentDate": {"lastModified": True}
-                        },
-                        upsert=True
-                    )
+            # Update the DB
+            self.updateTerms(enabledTerms)
 
             return response_dict
 
@@ -770,7 +552,7 @@ class MTRoyal(threading.Thread):
 
         # Spawn threads to get the descriptions for courses
         for i in range(self.settings["descConcurrency"]):
-            scaper = CourseDescriptions(q)
+            scaper = CourseDescriptions(q, super())
             scaper.daemon = True
             scaper.start()
 
@@ -809,20 +591,12 @@ class MTRoyal(threading.Thread):
 
             thisclass["location"] = "Main Campus"
 
-            # Upsert the object
-            self.db.MTRoyalCourseList.update(
-                {"id": thisclass["id"], "term": thisclass["term"]},
-                {
-                    "$set": thisclass,
-                    "$currentDate": {"lastModified": True}
-                },
-                upsert=True
-            )
+            # Update the class in the DB
+            self.updateClass(thisclass)
 
             if not retrievingDesc:
                 # check whether we need to grab a description for this course
-                hasDesc = self.db.MTRoyalCourseDesc.find_one({"coursenum": thisclass["coursenum"],
-                                                              "subject": thisclass["subject"]})
+                hasDesc = self.getCourseDescription(thisclass["coursenum"], thisclass["subject"])
 
                 if not hasDesc:
                     # We'll make a thread to try to retrieve the description for this course
@@ -832,10 +606,12 @@ class MTRoyal(threading.Thread):
     def updateSubjects(self, subjects):
         """
         Upserts a given dictionary of subjects into the DB
+
         :param subjects: **dict** Keys are the subject codes, values are the names
         :return:
         """
         log.debug("Updating subject definitions")
+
         for subject in subjects:
             subjectname = subjects[subject]
 
@@ -844,15 +620,7 @@ class MTRoyal(threading.Thread):
                 "name": subjectname
             }
 
-            # Update the subject data in the DB
-            self.db.MTRoyalSubjects.update(
-                {"subject": subjectdict["subject"]},
-                {
-                    "$set": subjectdict,
-                    "$currentDate": {"lastModified": True}
-                },
-                upsert=True
-            )
+            self.updateSubject(subjectdict)
 
     def run(self):
         """
@@ -889,7 +657,8 @@ class MTRoyal(threading.Thread):
                                         self.parseClassList(classdata, term)
 
                 except Exception as e:
-                    log.critical("Exception | " + str(e))
+                    log.critical("CHECK EXCEPTION")
+                    traceback.print_exc()
 
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
@@ -905,7 +674,7 @@ class CourseDescriptions(threading.Thread):
     mainpage = "http://www.ucalgary.ca/pubs/calendar/current/"
     fullname = ""  # full name of the subject (CPSC = Computer Science)
 
-    def __init__(self, q):
+    def __init__(self, q, parent):
         """
         Constructor for retrieving course descriptions
 
@@ -915,8 +684,8 @@ class CourseDescriptions(threading.Thread):
         :return:
         """
         threading.Thread.__init__(self)
-        self.db = pymongo.MongoClient().ScheduleStorm
         self.q = q
+        self.super = parent
 
     def processBody(self, data, body, error):
         """
@@ -976,15 +745,7 @@ class CourseDescriptions(threading.Thread):
 
                         index += 1
 
-        # Upsert the updated description into the DB
-        self.db.MTRoyalCourseDesc.update(
-            {"coursenum": descobj["coursenum"], "subject": descobj["subject"]},
-            {
-                "$set": descobj,
-                "$currentDate": {"lastModified": True}
-            },
-            upsert=True
-        )
+        self.super.updateCourseDesc(descobj)
 
     def run(self):
         while not self.q.empty():
