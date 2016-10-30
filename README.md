@@ -43,7 +43,7 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 | uniID     | string | No       | ID/Abbreviation of the University (ex. UCalgary, MTRoyal)
 | fullname  | string | No       | Full name of the university shown to the user (ex. University of Calgary)
 | enabled   | bool   | No       | Boolean as to whether this university is enabled or not
-| scrape    | bool   | No       | If true, runs the university thread to fetch updated course info
+| scrape    | bool   | No       | If true, starts the university thread to fetch updated course info
 | rmpid     | int    | Yes      | RMP ID of the University to fetch professor data from
 
 
@@ -56,3 +56,41 @@ Simply go to [Rate My Professors](http://www.ratemyprofessors.com/) and search f
 Afterwards, you will be forwarded to a URL such as: http://www.ratemyprofessors.com/campusRatings.jsp?sid=1416
 
 The sid parameter is the school ID, thus, this RMP ID is 1416.
+
+
+## Creating Your University Python File
+
+### File Name
+
+**All of the universities are located in the "uni" folder with their names being \<uniID\>.py**
+
+For example: University of Calgary has a uniID of "UCalgary" in the settings file, so its file is UCalgary.py.
+
+### Creating the Class
+
+Each university inherits the University class, which inherits the threading.Thread class. 
+
+Within your Uni file, you must import the University superclass at the top: `from .University import University`
+
+Next, you'll want to create a class that inherits University and is named your uniID along with instantiating the University superclass in your `__init__` method.
+
+ex. If your uniID is "UCalgary"
+
+```python
+from .University import University
+
+class UCalgary(University):
+    def __init__(self, settings):
+        super().__init__(settings)
+
+    def run(self):
+        """
+        Scraping thread that obtains updated course info
+        :return:
+        """
+        self.log.info("Obtain course info here!")
+```
+
+**Within the run method, you should fetch updated course data**
+
+It is highly recommended that you set a scraping interval within your settings file to pause the scraping every X seconds after it is finished before scraping again.
