@@ -109,8 +109,13 @@ if __name__ == '__main__':
     log.info("Starting University Threads")
     # Start each Uni thread
     for uniThread in uniThreads:
-        log.info("Starting " + uniThread + "'s thread")
-        uniThreads[uniThread].start()
+        if "scrape" not in settings["Universities"][uniThread]:
+            log.error(uniThread + " must have a scrape attribute!")
+        else:
+            if settings["Universities"][uniThread]["scrape"] is True:
+                # scraping is enabled
+                log.info("Starting " + uniThread + "'s thread")
+                uniThreads[uniThread].start()
 
     # Start up the RateMyProfessors scraper if there is at least one rmp id
     if len(rmpids) > 0 and "rmpinterval" in settings:
