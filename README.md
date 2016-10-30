@@ -70,9 +70,9 @@ For example: University of Calgary has a uniID of "UCalgary" in the settings fil
 
 Each university inherits the University class, which inherits the threading.Thread class. 
 
-Within your Uni file, you must import the University superclass at the top: `from .University import University`
+Within your Uni file, you must import the University superclass at the top: `from .University import University`. The `University` superclass contains the API handlers and DB interaction methods.
 
-Next, you'll want to create a class that inherits University and is named your uniID along with instantiating the University superclass in your `__init__` method.
+Next, you'll want to create a class that inherits `University` and is named your uniID along with instantiating the University superclass in your `__init__` method.
 
 ex. If your uniID is "UCalgary"
 
@@ -94,3 +94,52 @@ class UCalgary(University):
 **Within the run method, you should fetch updated course data**
 
 It is highly recommended that you set a scraping interval within your settings file to pause the scraping every X seconds after it is finished before scraping again.
+
+## Adding Terms to the DB
+
+Since each university inherits the `University` superclass, all interaction with the MongoDB database is done through it. You can use the following methods to interface with the terms.
+
+### Term Object
+Term Objects are dictionaries with the specified keys
+
+| key       | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| id        | string | No       | Unique ID of the Term (ex. "20235")
+| name      | string | No       | Name of the term (ex. "Fall 2016")
+
+Within the DB, it also contains an enabled flag that specifies whether it is shown to users or not. The Term methods abstract this from you.
+
+## Term Methods
+
+### `updateTerms(list terms)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| terms     | list   | No       | List of term objects to update in the DB
+
+**NOTE: This sets the only enabled terms to be the specified terms in the list**
+
+Updates the terms specified into the DB. If the term doesn't exist in the DB yet, it is inserted.
+
+### `updateTerm(dict term)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| term      | dict   | No       | Term object to update in the DB
+
+Updates the term specified into the DB and sets its enabled flag to `True` (shows it to users). If the term doesn't exist in the DB yet, it is inserted.
+
+### `getTerm(str/int termid)`
+Arguments:
+
+| name      | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| termid    | string | No       | ID of the term for fetch the term obj for
+
+Returns: Term object for the specified termid if succesful, False if not
+
+### `resetEnabledTerms()`
+
+Sets every term within the DB to have a `False` enabled flag (isn't shown to users).
