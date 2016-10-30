@@ -1,73 +1,55 @@
-# ScheduleStorm_Server
-University Schedule Generator http://schedulestorm.com
+<p align="center">
+  <img src="http://i.imgur.com/ZBRXem4.png"/>
+</p>
 
+[ScheduleStorm.com](http://schedulestorm.com)
 
-## Rough DB Schema
+## Schedule Storm Server
 
-UCalgary implements the following DB structure in MongoDB
+Welcome to the back-end that powers Schedule Storm. The back-end is written entirely in Python using Falcon, Beautiful Soup, ldap3, requests, MongoDB, and pymongo.
 
-I will add what the optional values are soon...
+As you might expect, Schedule Storm is reliant upon class data for numerous universities. Since many universities don't have APIs to query, the vast majority of scraping is done on HTML using Beautiful Soup and Requests. Here you'll be able to find documentation on how to add your University to Schedule Storm.
 
-### UniversityCourseList
+# How to Add Your University
 
-Contains the classes objs (DOES NOT INCLUDE CLASS DESCRIPTIONS, SEE COURSEDESC)
+1. Settings File
+2. Creating Your University Python File
+3. Adding Terms to the DB
+4. Adding Course Descriptions to the DB
+5. Adding Classes to the DB
 
-ex.
-```json
-UCalgaryCourseList
-{
-	"subject": "CPSC",
-	"type": "LAB",
-	"scheduletype": "Regular",
-	"coursenum": "101",
-	"id": 70349,
-	"term": 2179,
-	"times": ["Fr 9:00AM - 11:50AM", "Fr 1:00PM - 3:50PM"],
-	"location": "Main UofC Campus",
-	"rooms": ["ST 135", "ST 135"],
-	"teachers": ["Staff", "Syed Zain Raza Rizvi"],
-	"group": "1",
-	"status": "Closed",
-	"restrictions": true,
-	"notes": "Notes: This is a combined section class",
-	"lastupdated": 23423432
-}
-```
+## Settings File
 
-### UniversityCourseDesc
-Includes the course descriptions
+Using the settings file, you can tell Schedule Storm your University's rmpid, api key, username, password, etc...
 
-ex.
+**Every University Must Have An Entry in settings.json**
+
 ```javascript
 {
-	"coursenum": "101",
-	"subject": "CPSC",
-	"name": "Introduction To Unix",
-	"desc": "An introduction to the Unix operating system, including the text editor \"emacs,\" its programming modes and macros; shell usage (including \"sh\" and \"tcsh\"); and some advanced Unix commands.",
-	"notes": "This course is highly recommended as preparation for Computer Science 217 or 231 or 235.",
-	"nogpa": false,
-	"repeat": true, // can repeat it for GPA
-	"antirequisites": "Credit for Computer Science 217 and any of 215, 231, 235 or Computer Engineering 339 or Engineering 233 will not be allowed.",
-	"prerequisite": "Computer Science 217.",
-	"corequisites": "",
-	"units": 3.0,
-	"hours": "H(2-2)",
-	"aka": "",
-	"lastupdated": 23423432
-}
+    "Universities": {
+    	...
+        "<uniID>": {
+            "fullname": "<University Name>"
+            "enabled": true,
+            "rmpid": <rmpid>
+        },
+	...
 ```
 
-### UniversitySubjects
+| key       | Type   | Optional | Notes
+| --------- | ------ | -------- | ------ |
+| uniID     | string | No       | ID/Abbreviation of the University (ex. UCalgary, MTRoyal)
+| fullname  | string | No       | Full name of the university shown to the user (ex. University of Calgary)
+| enabled   | bool   | No       | Boolean as to whether this university is enabled or not
+| rmpid     | int    | Yes      | RMP ID of the University to fetch professor data from
 
-Contains the numerous subjects and their descriptions. Not all Universities will have a good source for faculties. If so, omit that field.
 
-ex.
-```json
-{
-	"subject": "CPSC",
-	"name": "Computer Science",
-	"notes": "Computer Science students should also see courses listed under Software Engineering.",
-	"faculty": "Faculty of Science",
-	"instruction": "Instruction offered by members of the Department of Computer Science in the Faculty of Science."
-}
-```
+Within the university's JSON block, you can have as many more attributes as you'd like. Here, you can specify usernames, passwords, api keys, and they'll all be passed to your University thread upon creation.
+
+#### How to get the RMP ID?
+
+Simply go to [Rate My Professors](http://www.ratemyprofessors.com/) and search for your university in the search bar. Make sure you click on your university in the bottom "Schools" section. 
+
+Afterwards, you will be forwarded to a URL such as: http://www.ratemyprofessors.com/campusRatings.jsp?sid=1416
+
+The sid parameter is the school ID, thus, this RMP ID is 1416.
