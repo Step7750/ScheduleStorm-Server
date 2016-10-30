@@ -226,9 +226,10 @@ Class Objects are dictionaries with the specified keys
 | --------- | ------ | -------- | ------ | ------ |
 | id        | int    | No       | Yes    | ID of the class (ex. "34534")
 | subject   | string | No       | No     | Subject abbreviation (ex. "CPSC")
+| term      | string | No       | No     | Term ID that this class belongs to (ex. "2342")
 | coursenum | string | No       | No     | Course number of the description to obtain (ex. "300")
-| rooms     | list   | No       | No     | List of strings that contain the rooms that this class is situated in (ex. ["MFH 164", "HEH 101"]. If there are no rooms, set it to ["TBA"] or ["N/A"]
-| teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]. If there are no teachers, set it to ["TBA"] or ["N/A"]
+| rooms     | list   | No       | No     | List of strings that contain the rooms that this class is situated in (ex. ["MFH 164", "HEH 101"]). If there are no rooms, set it to ["TBA"] or ["N/A"]
+| teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]). If there are no teachers, set it to ["TBA"] or ["N/A"]
 | type      | string | No       | No     | Type of the class (ex. "LEC")
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
 | group     | string | No       | No     | Group of this class. If another class with the same coursenum and subject yet different type and has the same group value, the two classes can be taken together. (ex. "1")
