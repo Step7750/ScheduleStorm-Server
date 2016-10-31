@@ -19,6 +19,8 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 * pymongo
 * falcon
 
+#### You can automatically install the dependencies using `pip install -r requirements.txt`
+
 #### Also requires MongoDB to be running
 
 Go through `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
