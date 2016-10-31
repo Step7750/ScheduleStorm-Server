@@ -10,6 +10,27 @@ Welcome to the back-end that powers Schedule Storm. The back-end is written enti
 
 As you might expect, Schedule Storm is reliant upon class data for numerous universities. Since many universities don't have APIs to query, the vast majority of scraping is done on HTML using Beautiful Soup and Requests. Here you'll be able to find documentation on how to add your University to Schedule Storm.
 
+# How to Run
+
+### Python Dependencies
+* Requests
+* Beautiful Soup 4
+* ldap 3
+* pymongo
+* falcon
+
+#### Also requires MongoDB to be running
+
+Go through `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
+
+The default port is 3000, you can change this at the bottom of index.py
+
+Make sure MongoDB is running and simply run: `python index.py`
+
+You can browse the API by going to `http//localhost:3000/v1/unis` or `http://localhost:3000/v1/unis/{uni}/{term}/all`
+
+If you'd like to use the front-end with your local API, clone it and change the URLs at the top of `ClassList.js` and `Welcome.js`
+
 # How to Add Your University
 
 1. Settings File
