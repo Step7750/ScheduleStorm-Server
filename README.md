@@ -256,10 +256,26 @@ Class Objects are dictionaries with the specified keys
 | teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]). If there are no teachers, set it to ["TBA"] or ["N/A"]
 | type      | string | No       | No     | Type of the class (ex. "LEC")
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
-| group     | string | No       | No     | Group of this class. If another class with the same coursenum and subject yet different type and has the same group value, the two classes can be taken together. (ex. "1")
+| group     | list | No       | No     | Group(s) of this class (ex. ["1", "2"]). See below for further details.
 | status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
 | section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
+
+### `group` Attribute
+
+Most universities have a system where you must take some specific classes together (and they are incompatible with others). In order to resolve this, the `group` attribute defines the classes that can be taken together. Two classes that have at least one match in their group lists can be taken together.
+
+The generator ensures that it only matches compatible classes with each other and if a user tries to manually specify two incompatible classes, it doesn't generate any possibilities.
+
+If a specific course doesn't care whether two classes are compatible, just set each class' `group` to `["1"]`.
+
+Ex. 
+* CPSC 301 LEC `group: ["1", "2"]`
+* CPSC 301 LEC2 `group: ["2", "3"]`
+* CPSC 301 TUT `group: ["2"]`
+* CPSC 301 TUT2 `group: ["3"]`
+
+LEC and TUT are compatible, LEC2 is compatible with TUT and TUT2
 
 ### Time Formatting
 
