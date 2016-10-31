@@ -6,15 +6,15 @@
             "password": "",
             "ucid": "",
             "scrapeinterval": 3600,
-            "enabled": true,
+            "enabled": false,
             "scrape": false,
             "rmpid": 1416,
             "_comment": "UCalgary does not support multi-threading (on the same account), incorrect data will be retrieved"
         },
         "UAlberta": {
             "fullname": "University of Alberta",
-            "enabled": true,
-            "scrape": true,
+            "enabled": false,
+            "scrape": false,
             "scrapeinterval": 7200,
             "uidConcurrency": 10,
             "uidConcurrency_comment": "Max amount of concurrent requests to fetch UID Professor Names",
