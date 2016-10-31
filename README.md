@@ -10,6 +10,8 @@ Welcome to the back-end that powers Schedule Storm. The back-end is written enti
 
 As you might expect, Schedule Storm is reliant upon class data for numerous universities. Since many universities don't have APIs to query, the vast majority of scraping is done on HTML using Beautiful Soup and Requests. Here you'll be able to find documentation on how to add your University to Schedule Storm.
 
+#### Feel free to send pull requests that add universities/features
+
 # How to Run
 
 ### Python 3 Dependencies
@@ -21,7 +23,7 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 
 #### You can automatically install the dependencies using `pip install -r requirements.txt`
 
-#### Also requires MongoDB to be running
+#### Note: Requires MongoDB to be running
 
 Go through `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
 
@@ -73,13 +75,13 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 
 Within the university's JSON block, you can have as many more attributes as you'd like. Here, you can specify usernames, passwords, api keys, and they'll all be passed to your University thread upon creation.
 
-#### How do I get the RMP ID?
+#### How do I get the rmpid?
 
 Simply go to [Rate My Professors](http://www.ratemyprofessors.com/) and search for your university in the search bar. Make sure you click on your university in the bottom "Schools" section.
 
 Afterwards, you will be forwarded to a URL such as: http://www.ratemyprofessors.com/campusRatings.jsp?sid=1416
 
-The sid parameter is the school ID, thus, this RMP ID is 1416.
+The sid parameter is the rmpid, so this rmpid is 1416.
 
 
 # Creating Your University Python File
@@ -340,7 +342,7 @@ Updates the class specified into the DB. If the class doesn't exist in the DB ye
 		* `self.log.error("You can't do this")`
 		* `self.log.info("Scraping courses")`
 * You can access your uni settings object with `self.settings` within the uni class
-* Add a `scrapeinterval` in your settings file and add a delay between successful scraping sessions using `time.sleep(self.settings["scrapeinterval"]`
+* Add a `scrapeinterval` in your settings file and add a delay between successful scraping sessions using `time.sleep(self.settings["scrapeinterval"])`
 * Look at `Example.py` for a starting point, make sure you edit the settings file though!
 * If you want to add more attributes to a class/subject/term/coursedesc object, go ahead! They won't be used by the front-end, but we can add support for it later on!
 * If you have any questions/concerns, feel free to file an issue or talk to us!
