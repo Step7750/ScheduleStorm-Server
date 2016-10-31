@@ -33,12 +33,12 @@ If you'd like to use the front-end with your local API, clone it and change the 
 
 # How to Add Your University
 
-1. Settings File
-2. Creating Your University Python File
-3. Terms
-4. Subjects
-5. Course Descriptions
-6. Classes
+1. [Settings File](https://github.com/Step7750/ScheduleStorm_Server#settings-file)
+2. [Creating Your University Python File](https://github.com/Step7750/ScheduleStorm_Server#creating-your-university-python-file)
+3. [Terms](https://github.com/Step7750/ScheduleStorm_Server#terms)
+4. [Subjects](https://github.com/Step7750/ScheduleStorm_Server#subjects)
+5. [Course Descriptions](https://github.com/Step7750/ScheduleStorm_Server#course-descriptions)
+6. [Classes](https://github.com/Step7750/ScheduleStorm_Server#classes)
 
 # Settings File
 
@@ -53,7 +53,7 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
         "<uniID>": {
             "fullname": "<University Name>"
             "enabled": true,
-	    "scrape": true,
+	    	"scrape": true,
             "rmpid": <rmpid>,
 	    ...
         },
