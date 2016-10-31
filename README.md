@@ -4,7 +4,7 @@
 
 [ScheduleStorm.com](http://schedulestorm.com)
 
-## Schedule Storm Server
+[You Can Find the Front-End Repo Here](https://github.com/Step7750/ScheduleStorm)
 
 Welcome to the back-end that powers Schedule Storm. The back-end is written entirely in Python using Falcon, Beautiful Soup, ldap3, requests, MongoDB, and pymongo.
 
@@ -12,7 +12,7 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 
 # How to Run
 
-### Python Dependencies
+### Python 3 Dependencies
 * Requests
 * Beautiful Soup 4
 * ldap 3
@@ -25,7 +25,7 @@ Go through `settings.json` and set the `enabled` and `scrape` settings to true f
 
 The default port is 3000, you can change this at the bottom of index.py
 
-Make sure MongoDB is running and simply run: `python index.py`
+Simply execute (tested on Python 3.4+): `python index.py`
 
 You can browse the API by going to `http//localhost:3000/v1/unis` or `http://localhost:3000/v1/unis/{uni}/{term}/all`
 
@@ -71,9 +71,9 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 
 Within the university's JSON block, you can have as many more attributes as you'd like. Here, you can specify usernames, passwords, api keys, and they'll all be passed to your University thread upon creation.
 
-#### How to get the RMP ID?
+#### How do I get the RMP ID?
 
-Simply go to [Rate My Professors](http://www.ratemyprofessors.com/) and search for your university in the search bar. Make sure you click on your university in the bottom "Schools" section. 
+Simply go to [Rate My Professors](http://www.ratemyprofessors.com/) and search for your university in the search bar. Make sure you click on your university in the bottom "Schools" section.
 
 Afterwards, you will be forwarded to a URL such as: http://www.ratemyprofessors.com/campusRatings.jsp?sid=1416
 
