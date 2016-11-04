@@ -15,41 +15,18 @@ import logging
 import re
 from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
 from queue import Queue
+from .University import University
 
 log = logging.getLogger("UAlberta")
 
-class UAlberta(threading.Thread):
+
+class UAlberta(University):
     def __init__(self, settings):
-        threading.Thread.__init__(self)
+        super().__init__(settings)
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
-        log.info("Ensuring MongoDB indexes exist")
-
-        # want to add indexes (if they already exist, nothing will happen)
-        self.db.UAlbertaCourseDesc.create_index([
-            ("coursenum", pymongo.ASCENDING),
-            ("subject", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.UAlbertaCourseList.create_index([
-            ("id", pymongo.ASCENDING),
-            ("term", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.UAlbertaSubjects.create_index([
-            ("subject", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.UAlbertaProfessor.create_index([
-            ("uid", pymongo.ASCENDING)],
-            unique=True)
-
-        self.db.UAlbertaTerms.create_index([
-            ("term", pymongo.ASCENDING)],
-            unique=True)
-
-    def getTerms(self):
+    '''def getTerms(self):
         """
         API Handler
 
@@ -61,192 +38,7 @@ class UAlberta(threading.Thread):
         responsedict = {}
         for term in termlist:
             responsedict[str(term)] = self.db.UAlbertaTerms.find_one({"term": str(term)})['termTitle']
-        return responsedict
-
-    def getLocations(self):
-        """
-        API Handler
-
-        Returns a list of all locations at UAlberta
-
-        :return: **list** Contains 1D with the possible locations
-        """
-        locations = self.db.UAlbertaCourseList.distinct("location")
-        response = []
-
-        for location in locations:
-            if location != "":
-                response.append(location)
-
-        return response
-
-    def retrieveCourseDesc(self, courses):
-        """
-        Given a course list from an API handler, retrieves course descriptions and sorts by faculty
-
-        Pure Function
-
-        :param courses: **dict** List of courses from API handler
-        :return: **dict** Faculty sorted dict with course descriptions
-        """
-        facultydict = {}
-
-        # Get the descriptions for each subject
-        for subject in courses:
-            result = self.db.UAlbertaSubjects.find_one({"subject": subject})
-
-            if result:
-                del result["_id"]
-                del result["subject"]
-                del result["lastModified"]
-
-                if "faculty" not in result:
-                    result["faculty"] = "Other"
-
-                if result["faculty"] not in facultydict:
-                    facultydict[result["faculty"]] = {}
-
-                facultydict[result["faculty"]][subject] = courses[subject]
-
-                facultydict[result["faculty"]][subject]["description"] = result
-
-        return facultydict
-
-    def getSubjectListAll(self, term):
-        """
-        API Handler
-
-        Returns all data for a given term (classes, descriptions and RMP)
-
-        :param term: **string/int** ID of the term
-        :return: **dict** All data for the term
-        """
-        responsedict = {}
-
-        classes = self.db.UAlbertaCourseList.find({'term': int(term)})
-
-        distinctProfessors = []
-
-        # Parse each class and get their descriptions
-        for course in classes:
-
-            del course["_id"]
-            if course["subject"] not in responsedict:
-                responsedict[course["subject"]] = {}
-
-            if course["coursenum"] not in responsedict[course["subject"]]:
-                responsedict[course["subject"]][course["coursenum"]] = {"classes": []}
-
-            subj = course["subject"]
-            coursen = course["coursenum"]
-
-            # Get the class description
-            if "description" not in responsedict[subj][coursen]:
-                result = self.db.UAlbertaCourseDesc.find_one({"coursenum": coursen, "subject": subj})
-                if result:
-                    # Remove unneeded fields
-                    del result["_id"]
-                    del result["subject"]
-                    del result["coursenum"]
-                    del result["lastModified"]
-
-                    responsedict[subj][coursen]["description"] = result
-                else:
-                    responsedict[subj][coursen]["description"] = False
-
-            # Remove unneeded fields
-            del course["subject"]
-            del course["coursenum"]
-            del course["lastModified"]
-
-            # Add this class to the course list
-            responsedict[subj][coursen]["classes"].append(course)
-            for professor in course['teachers']:
-                if professor not in distinctProfessors:
-                    distinctProfessors.append(professor)
-
-        # Add the faculty sorting and course descriptions
-        responsedict = self.retrieveCourseDesc(responsedict)
-
-        # Match RMP data
-        rmpobj = self.matchRMPNames(distinctProfessors)
-        # Send over a list of all the professors with a RMP rating in the list
-        return {"classes": responsedict, "rmp": rmpobj}
-
-    def matchRMPNames(self, distinctteachers):
-        """
-        Given a list of teachers to match RMP data to, this function obtains all RMP data and tries to match the names
-        with the distinctteachers list and returns the matches
-
-        We first check whether the constructed name is simply the same in RMP
-        If not, we check whether the first and last words in a name in RMP is the same
-        If not, we check whether any first and last words in the teachers name has a result in RMP that starts
-            with the first and last words
-        If not, we give up and don't process the words
-
-        Most teachers should have a valid match using this method, many simply don't have a profile on RMP
-        Around 80%+ of valid teachers on RMP should get a match
-
-        False positives are possible, but highly unlikely given that it requires the first and last name of the
-        wrong person to start the same way
-
-        :param distinctteachers: **list** Distinct list of all teachers to find an RMP match for
-        :return: **dict** Matched teachers and their RMP ratings
-        """
-        # Get the RMP data for all teachers at UAlberta
-        rmp = self.db.RateMyProfessors.find({"school": self.settings["rmpid"]})
-
-        returnobj = {}
-        # We want to construct the names of each teacher and invert the results for easier parsing
-        # and better time complexity
-        rmpinverted = {}
-        for teacher in rmp:
-            # Construct the name
-            fullname = ""
-            if "firstname" in teacher:
-                fullname += teacher["firstname"]
-            if "middlename" in teacher:
-                fullname += " " + teacher["middlename"]
-            if "lastname" in teacher:
-                fullname += " " + teacher["lastname"]
-
-            # remove unnecessary fields
-            del teacher["_id"]
-            del teacher["lastModified"]
-            del teacher["school"]
-
-            rmpinverted[fullname] = teacher
-
-        # Iterate through each distinct teacher
-        for teacher in distinctteachers:
-            if teacher in rmpinverted:
-                # We found an instant match, add it to the return dict
-                returnobj[teacher] = rmpinverted[teacher]
-            else:
-                # Find the first and last words of the name
-                teacherNameSplit = teacher.split(" ")
-                lastword = teacherNameSplit[-1]
-                firstword = teacherNameSplit[0]
-
-                # Check to see if the first and last words find a match (without a middle name)
-                namewithoutmiddle = firstword + " " + lastword
-
-                if namewithoutmiddle in rmpinverted:
-                    # Found the match! Add an alias field
-                    returnobj[teacher] = rmpinverted[namewithoutmiddle]
-                else:
-                    # Find a teacher in RMP that had the first and last words of their name starting the
-                    # respective words in the original teacher's name
-                    for teacher2 in rmpinverted:
-                        splitname = teacher2.split(" ")
-                        first = splitname[0]
-                        last = splitname[-1]
-
-                        if lastword.startswith(last) and firstword.startswith(first):
-                            returnobj[teacher] = rmpinverted[teacher2]
-                            break
-
-        return returnobj
+        return responsedict'''
 
     def parseCourseDescription(self, req):
         """
@@ -351,14 +143,7 @@ class UAlberta(threading.Thread):
                 courseDesc['desc'] = desc
 
             # Upserts course description
-            self.db.UAlbertaCourseDesc.update(
-                {'coursenum': entry['attributes']['catalog'], 'subject': entry['attributes']['subject']},
-                {
-                    '$set': courseDesc,
-                    '$currentDate': {'lastModified': True}
-                },
-                upsert=True
-            )
+            self.updateCourseDesc(courseDesc)
 
     def UidToName(self, uid):
         """
@@ -392,6 +177,15 @@ class UAlberta(threading.Thread):
                                                        attributes=['asString', 'class', 'term', 'campus',
                                                                    'section', 'component', 'enrollStatus',
                                                                    'course', 'instructorUid'],
+                                                       paged_size=400,
+                                                       generator=False)
+
+        # Searches for additional information
+        times_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                       search_filter='(&(!(textbook=*))(class=*)(classtime=*))',
+                                                       search_scope=SUBTREE,
+                                                       attributes=['day', 'class', 'startTime', 'endTime',
+                                                                   'location'],
                                                        paged_size=400,
                                                        generator=False)
 
@@ -458,45 +252,27 @@ class UAlberta(threading.Thread):
             else:
                 courseList['teachers'] = ["N/A"]
 
+            # for entry in list, match the days, startTime, endTime, and locations to course
+            for entry_times in times_list:
+
+                if entry_times['attributes']['class'] == courseList['id']:
+
+                    # Combines day, startTime, endTime into a duration
+                    duration = " "
+                    duration = duration.join(
+                        (entry_times['attributes']['day'][0], entry_times['attributes']['startTime'][0].replace(" ", ""),
+                         entry_times['attributes']['endTime'][0].replace(" ", "")))
+
+                    # Adds '-' btw the times
+                    duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
+                    courseList['times'] = [duration]
+
+                    # Does the class have an assigned classroom
+                    if 'location' in entry['attributes']:
+                        courseList['rooms'] = [entry['attributes']['location']]
             # Upserts course into db
-            self.db.UAlbertaCourseList.update(
-                {'id': str(entry['attributes']['class'])},
-                {'$set': courseList, '$currentDate': {'lastModified': True}},
-                upsert=True
-            )
+            self.updateClass(courseList)
 
-        # Searches for additional information
-        entry_list = conn.extend.standard.paged_search(search_base=searchBase,
-                                                       search_filter='(&(!(textbook=*))(class=*)(classtime=*))',
-                                                       search_scope=SUBTREE,
-                                                       attributes=['day', 'class', 'startTime', 'endTime',
-                                                                   'location'],
-                                                       paged_size=400,
-                                                       generator=False)
-        log.info('Matching additional data to course list')
-
-        # for entry in list, match the days, startTime, endTime, and locations to course
-        for entry in entry_list:
-
-            # Combines day, startTime, endTime into a duration
-            duration = " "
-            duration = duration.join((entry['attributes']['day'][0], entry['attributes']['startTime'][0].replace(" ", ""),
-                                      entry['attributes']['endTime'][0].replace(" ", "")))
-
-            # Adds '-' btw the times
-            duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
-            courseList = {'times': [duration]}
-
-            # Does the class have an assigned classroom
-            if 'location' in entry['attributes']:
-                courseList['rooms'] = [entry['attributes']['location']]
-
-            # Upserts additional information
-            self.db.UAlbertaCourseList.update(
-                {'id': str(entry['attributes']['class'])},
-                {'$set': courseList, '$currentDate': {'lastModified': True}},
-                upsert=True
-            )
 
     def scrapeTerms(self, conn):
         """
@@ -511,25 +287,16 @@ class UAlberta(threading.Thread):
         conn.search(search_base='ou=calendar, dc=ualberta, dc=ca', search_filter='(term=*)', search_scope=LEVEL,
                     attributes=['term', 'termTitle'])
         terms = []
-        termDict = {}
 
         # Gets the four most recent terms
         for item in range(1, 5):
             entry = conn.entries[len(conn.entries)-item]
-            termDict['term'] = str(entry['term'])
-            termDict['termTitle'] = str(entry['termTitle']).replace("Term ", "")
+            termDict = {"id": str(entry['term']), "name": str(entry['termTitle']).replace("Term ", "")}
 
             # Adds term to term DB
-            self.db.UAlbertaTerms.update(
-                {'term': str(entry['term'])},
-                {'$set': termDict},
-                upsert=True
-            )
+            self.updateTerm(termDict)
 
             terms.append(termDict)
-
-
-
         # Returns current terms
         return terms
 
@@ -544,12 +311,11 @@ class UAlberta(threading.Thread):
 
         # Gets all recent terms and cycles through them
         for term in self.scrapeTerms(conn):
-
             # If the term is a continue education term or main term update faculties
-            if int(term['term']) % 3 == 0 or int(term['term']) % 10 == 0:
+            if int(term['id']) % 3 == 0 or int(term['id']) % 10 == 0:
 
                 # Sets the search base for the query
-                searchBase = 'term='+term['term']+', ou=calendar, dc=ualberta, dc=ca'
+                searchBase = 'term='+term['id']+', ou=calendar, dc=ualberta, dc=ca'
                 log.info("Updating faculties with search base " + searchBase)
 
                 # Page queries all faculties in current term
@@ -563,14 +329,10 @@ class UAlberta(threading.Thread):
                 # For each entry in list updates the faculty
                 for entry in entry_list:
                     if 'subject' in entry['attributes']:
-                        self.db.UAlbertaSubjects.update(
-                            {'subject': entry['attributes']['subject']},
-                            {'$set': {'subject': entry['attributes']['subject'], 'faculty': entry['attributes']['faculty'],
-                                      'name': entry['attributes']['subjectTitle']},
-                             '$currentDate': {'lastModified': True}
-                            },
-                            upsert=True
-                        )
+                        subjectDict = {'subject': entry['attributes']['subject'],
+                                       'faculty': entry['attributes']['faculty'],
+                                       'name': entry['attributes']['subjectTitle']}
+                        self.updateSubject(subjectDict)
         log.info('Finished updating faculties')
 
     def run(self):
@@ -591,11 +353,12 @@ class UAlberta(threading.Thread):
                     self.updateFaculties(conn)
 
                     # Get list of current terms
-                    terms = self.db.UAlbertaTerms.distinct("term")
+                    terms = self.getTerms()
+                    print(terms)
 
                     # For each term, get the courses
                     for term in terms:
-                        log.info('Obtaining ' + self.db.UAlbertaTerms.find({"term": term})[0]['termTitle'] + ' course data with id ' + term)
+                        log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
                         self.scrapeCourseList(conn, term)
                         self.scrapeCourseDesc(conn, term)
                     log.info('Finished scraping for UAlberta data')
