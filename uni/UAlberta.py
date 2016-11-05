@@ -26,19 +26,6 @@ class UAlberta(University):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
-    '''def getTerms(self):
-        """
-        API Handler
-
-        Returns the distinct terms in the database, along with their name and id
-
-        :return: **dict** Keys are the ids, values are the proper names
-        """
-        termlist = self.db.UAlbertaCourseList.distinct("term")
-        responsedict = {}
-        for term in termlist:
-            responsedict[str(term)] = self.db.UAlbertaTerms.find_one({"term": str(term)})['termTitle']
-        return responsedict'''
 
     def parseCourseDescription(self, req):
         """
