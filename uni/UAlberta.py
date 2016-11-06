@@ -257,6 +257,7 @@ class UAlberta(University):
                     # Does the class have an assigned classroom
                     if 'location' in entry['attributes']:
                         courseList['rooms'] = [entry['attributes']['location']]
+                    times_list.remove(entry_times)
             # Upserts course into db
             self.updateClass(courseList)
 
