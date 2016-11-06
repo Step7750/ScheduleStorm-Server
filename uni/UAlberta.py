@@ -26,6 +26,8 @@ class UAlberta(University):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
+        self.db.UAlbertaProfessor.create_index([("Name", pymongo.ASCENDING), ("uid", pymongo.ASCENDING)], unique=True)
+
 
     def parseCourseDescription(self, req):
         """
