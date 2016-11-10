@@ -31,6 +31,13 @@
             "_comment_descConcurrency": "Amount of concurrent scrapers that scrape mount royal course info",
             "scrapeinterval": 7200,
             "rmpid": 1570
+        },
+        "ULeth": {
+            "fullname": "University of Lethbridge",
+            "enabled": false,
+            "scrape": false,
+            "scrapeinterval": 7200,
+            "rmpid": 1435
         }
     },
     "rmpinterval": 21600

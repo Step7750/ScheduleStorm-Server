@@ -15,6 +15,22 @@ class University(threading.Thread):
     """
     Generic University class that every university should inherit
     """
+    types = {
+        "LECTURE": "LEC",
+        "TUTORIAL": "TUT",
+        "LAB": "LAB",
+        "SEMINAR": "SEM",
+        "LECTURE/LAB": "LCL",
+        "LAB/LECTURE": "LBL",
+        "CLINIC": "CLN",
+        "DISTANCE DELIVERY": "DD",
+        "BLENDED DELIVERY": "BL",
+        "WORK TERM": "WKT",
+        "FIELD WORK": "FLD",
+        "PRACTICUM": "PRC",
+        "CLINICAL": "CLI",
+        "INTERNSHIP": "IDS"
+    }
 
     def __init__(self, settings):
         super().__init__()
@@ -86,6 +102,23 @@ class University(threading.Thread):
             responsedict[str(term["id"])] = term["name"]
 
         return responsedict
+
+    def typeNameToAcronym(self, name):
+        """
+        Returns the type acronym given the name
+
+        If the name doesn't match, it returns False
+
+        :param name: **String** Type name to get the acronym for
+        :return: **String/bool** Acronym of the name if successful, False if not
+        """
+        name = name.upper()
+
+        if name in self.types:
+            return self.types[name]
+        else:
+            return False
+
 
     def updateTerms(self, terms):
         """
@@ -216,6 +249,18 @@ class University(threading.Thread):
         for subject in subjects:
             self.updateSubject(subject)
 
+    def getSubject(self, query):
+        """
+        Returns a subject if it matches the given query
+
+        :param query: **dict** Object with fields that you'd like the subject to match
+        :return: **dict/bool** If successful, the subject object, False if not
+        """
+        query["uni"] = self.settings["uniID"]
+
+        return self.db.Subjects.find_one(query)
+
+
     def updateClass(self, classobj):
         """
         Upserts the given class into the DB
@@ -335,9 +380,15 @@ class University(threading.Thread):
                         first = splitname[0]
                         last = splitname[-1]
 
-                        if lastword.startswith(last) and firstword.startswith(first):
-                            returnobj[teacher] = rmpinverted[teacher2]
-                            break
+                        # If the first word is larger, use that name as the reference point
+                        if len(firstword) < len(first):
+                            if last.startswith(lastword) and first.startswith(firstword):
+                                returnobj[teacher] = rmpinverted[teacher2]
+                                break
+                        else:
+                            if lastword.startswith(last) and firstword.startswith(first):
+                                returnobj[teacher] = rmpinverted[teacher2]
+                                break
 
         return returnobj
 
