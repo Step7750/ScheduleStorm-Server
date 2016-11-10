@@ -49,7 +49,7 @@ class ULeth(University):
 
         :return: **list** Term objects
         """
-        r = requests.get("https://www.uleth.ca/bridge/bwckschd.p_disp_dyn_sched", verify=False)
+        r = requests.get("https://www.uleth.ca/bridge/bwckschd.p_disp_dyn_sched")
 
         if r.status_code == requests.codes.ok:
             return self.parseWebTerms(r.text)
@@ -84,7 +84,7 @@ class ULeth(University):
             "p_term": term_id
         }
 
-        r = requests.post("https://www.uleth.ca/bridge/bwckgens.p_proc_term_date", data=post_data, verify=False)
+        r = requests.post("https://www.uleth.ca/bridge/bwckgens.p_proc_term_date", data=post_data)
 
         if r.status_code == requests.codes.ok:
             return self.parseWebSubjects(r.text)
@@ -127,7 +127,7 @@ class ULeth(University):
                     "&end_mi=0" \
                     "&end_ap=a"
 
-        r = requests.post("https://www.uleth.ca/bridge/bwckschd.p_get_crse_unsec", data=post_data, verify=False)
+        r = requests.post("https://www.uleth.ca/bridge/bwckschd.p_get_crse_unsec", data=post_data)
 
         if r.status_code == requests.codes.ok:
             return r.text
@@ -272,7 +272,7 @@ class ULeth(University):
 
         self.log.info("Obtaining course descriptions")
 
-        r = requests.get("https://www.uleth.ca/ross/sites/ross/files/imported/courses/courses.xml", verify=False)
+        r = requests.get("https://www.uleth.ca/ross/sites/ross/files/imported/courses/courses.xml")
 
         if r.status_code == requests.codes.ok:
 
