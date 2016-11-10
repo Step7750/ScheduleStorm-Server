@@ -168,7 +168,10 @@ class ULeth(University):
                 # Name of the course
                 name = " ".join(title[0:len(title)-3])
 
-                if len(title) > 3 and current_class["coursenum"] not in name:
+                # Ex. CPSC 3500, ensure its not in the title (indicates its a lab or something)
+                course_name = current_class["subject"] + " " + current_class["coursenum"]
+
+                if len(title) > 3 and course_name not in name:
                     # update the course description with this title
                     course_desc = {"name": name,
                                    "coursenum": current_class["coursenum"],
@@ -331,8 +334,6 @@ class ULeth(University):
             try:
                 self.log.info("Starting Scraping")
 
-                self.updateClassDescriptions()
-
                 # Get the terms
                 terms = self.getWebTerms()
 
@@ -358,6 +359,8 @@ class ULeth(University):
                             self.parseClassHTML(classes, term_id)
 
                         self.log.info("Done scraping class data for " + str(term_id))
+
+                    self.updateClassDescriptions()
 
                 self.log.info("Done scraping")
 
