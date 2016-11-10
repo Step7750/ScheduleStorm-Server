@@ -218,6 +218,7 @@ Course Description Objects are dictionaries with the specified keys
 | coreq     | string | Yes      | No     | Human-readable course corequisites (ex. "Must take CPSC 301 with this course")
 | antireq   | string | Yes      | No     | Human-readable course antirequisites (ex. "Student must not have taken CPSC 302")
 | notes     | string | Yes      | No     | Any further human-readable notes for this class (ex. "You might learn too much!")
+| aka 	    | string | Yes	| No 	 | Equivalent/old names for this class (ex. "Formally CPSC 234")
 
 The coursenum and subject fields together form a unique constraint.
 
@@ -260,6 +261,7 @@ Class Objects are dictionaries with the specified keys
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
 | group     | list | No       | No     | Group(s) of this class (ex. ["1", "2"]). See below for further details.
 | status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
+| location  | string | No  	| No 	 | Location of the class (ex. "Main Campus")
 | section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
 
