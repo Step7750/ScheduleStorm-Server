@@ -15,6 +15,7 @@ import logging
 import sys
 import falcon
 from wsgiref import simple_server
+import hashlib
 
 # Store the threads for each uni
 uniThreads = {}
@@ -44,8 +45,11 @@ class v1Unis():
                                  "locations": uniThreads[uni].getLocations(),
                                  "name": settings["Universities"][uni]["fullname"],
                                  "rmp": settings["Universities"][uni]["rmpid"]}
+        str_response = json.dumps(responsedict).encode('utf-8')
 
-        resp.body = json.dumps(responsedict)
+        # set the etag and body
+        resp.etag = "W/" + hashlib.sha1(str_response).hexdigest()
+        resp.body = str_response
 
 class v1GetAllUniTermSubjects():
     """
@@ -54,7 +58,11 @@ class v1GetAllUniTermSubjects():
     def on_get(self, req, resp, uni, term):
         # The term must be a string since the threads represent them as such
         if uni in uniThreads and term in uniThreads[uni].getTerms():
-            resp.body = json.dumps(uniThreads[uni].getSubjectListAll(term), sort_keys=True)
+            subject_list = json.dumps(uniThreads[uni].getSubjectListAll(term), sort_keys=True).encode('utf-8')
+
+            # set the etag and body
+            resp.etag = "W/" + hashlib.sha1(subject_list).hexdigest()
+            resp.body = subject_list
         else:
             raise falcon.HTTPBadRequest('Resource Not Found',
                                         'The specified university or term was not found')
