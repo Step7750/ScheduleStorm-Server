@@ -344,7 +344,6 @@ class UAlberta(University):
 
                     # Get list of current terms
                     terms = self.getTerms()
-                    print(terms)
 
                     # For each term, get the courses
                     for term in terms:
