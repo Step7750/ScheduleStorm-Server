@@ -21,16 +21,37 @@ class UWaterloo(University):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
+    def scrapeTerms(self, uw):
+        print(uw.terms())
+        log.info("SCraping terms")
+        termDictList = []
+        terms = uw.terms()
+        termList = terms['listings']
+        for term in termList:
+            for x in range(len(termList[term])):
+                if termList[term][x]['id'] == terms['previous_term']:
+                    termDict = {'id': terms['previous_term'], 'name': termList[term][x]['name']}
+                    termDictList.append(termDict)
+                elif termList[term][x]['id'] == terms['current_term']:
+                    termDict = {'id': terms['current_term'], 'name': termList[term][x]['name']}
+                    termDictList.append(termDict)
+                elif termList[term][x]['id'] == terms['next_term']:
+                    termDict = {'id': terms['next_term'], 'name': termList[term][x]['name']}
+                    termDictList.append(termDict)
+        self.updateTerms(termDictList)
+        log.info('Finished scraping terms')
+
     def updateFaculties(self, uw):
         log.info("Getting faculty list")
-        faculties = uw.group_codes
+        faculties = uw.group_codes()
 
         for subject in uw.subject_codes():
-            subjectdict = {'subject': subject['subject'], 'faculty': '', 'name': subject['description']}
+            subjectDict = {'subject': subject['subject'], 'faculty': '', 'name': subject['description']}
             for faculty in faculties:
                 if subject['group'] == faculty['group_code']:
-                    subjectdict[faculty] = faculty['group_full_name']
-            self.updateSubject(subjectdict)
+                    subjectDict['faculty'] = faculty['group_full_name']
+            self.updateSubject(subjectDict)
+        log.info('Finished updating faculties')
 
     def run(self):
         """
@@ -46,9 +67,14 @@ class UWaterloo(University):
                     #print(dir(uw))
 
                     self.updateFaculties(uw)
+                    self.scrapeTerms(uw)
+                    terms = self.getTerms()
+
+                    log.info('Finished scraping for UWaterloo data')
                 except Exception as e:
                     log.info("There was a critical exception | " + str(e))
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
+
         else:
             log.info("Scraping is disabled")
