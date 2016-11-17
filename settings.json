@@ -39,13 +39,6 @@
             "scrapeinterval": 7200,
             "rmpid": 1435
         }
-        "UWaterloo": {
-            "fullname": "University of Waterloo",
-            "enable": true,
-            "scrape": true,
-            "scrapeinterval": 7200,
-            "rmpid": 1490
-        }
     },
     "rmpinterval": 21600
 }
