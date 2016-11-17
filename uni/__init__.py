@@ -9,6 +9,7 @@ from . import UCalgary
 from . import MTRoyal
 from . import UAlberta
 from . import ULeth
+from . import UWaterloo
 
 
 
