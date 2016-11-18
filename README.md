@@ -20,6 +20,7 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 * ldap 3
 * pymongo
 * falcon
+* uwaterlooapi
 
 #### You can automatically install the dependencies using `pip install -r requirements.txt`
 
@@ -259,11 +260,14 @@ Class Objects are dictionaries with the specified keys
 | teachers  | list   | No       | No     | List of strings that contain the teachers teaching this class (ex. ["Jack Shepard", "Hugo 'Hurley' Reyes"]). If there are no teachers, set it to ["TBA"] or ["N/A"]
 | type      | string | No       | No     | Type of the class (ex. "LEC")
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
-| group     | list | No       | No     | Group(s) of this class (ex. ["1", "2"]). See below for further details.
+| group     | list   | No       | No     | Group(s) of this class (ex. ["1", "2"]). See below for further details.
 | status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
-| location  | string | No  	| No 	 | Location of the class (ex. "Main Campus")
+| location  | string | No  		| No 	 | Location of the class (ex. "Main Campus")
 | section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
+| curEnroll | int 	 | Yes 		| No 	 | Amount of students currently enrolled in the class
+| capEnroll | int    | Yes   	| No 	 | Maximum amount of students that are able to be enrolled in the class
+| waitEnroll | int   | Yes  	| No 	 | Amount of students waitlisted to take the course
 
 ### `group` Attribute
 
