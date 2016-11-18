@@ -268,6 +268,7 @@ Class Objects are dictionaries with the specified keys
 | curEnroll | int 	 | Yes 		| No 	 | Amount of students currently enrolled in the class
 | capEnroll | int    | Yes   	| No 	 | Maximum amount of students that are able to be enrolled in the class
 | waitEnroll | int   | Yes  	| No 	 | Amount of students waitlisted to take the course
+| capwaitEnroll | int | Yes 	| No 	 | Total amount of students that can waitlist the course
 
 ### `group` Attribute
 
