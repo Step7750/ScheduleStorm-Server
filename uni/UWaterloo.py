@@ -28,7 +28,7 @@ class UWaterloo(University):
             courseInfo = uw.term_course_schedule(term, course['subject'], course['catalog_number'])
             if len(courseInfo) != 0:
                 courseDict = {'coursenum': course['catalog_number'], 'subject': course['subject'], 'term': term,
-                              'id': courseInfo[0]['class_number'], 'group': course['class_number'],
+                              'id': courseInfo[0]['class_number'], 'group': courseInfo[0]['class_number'],
                               'type': courseInfo[0]['section'][:3], 'location': courseInfo[0]['campus'],
                               'status': str(courseInfo[0]['enrollment_total'])+'/' +
                                         str(courseInfo[0]['enrollment_capacity'])}
@@ -57,13 +57,12 @@ class UWaterloo(University):
 
             courseDesc = uw.course(course['subject'], course['catalog_number'])
             courseDict = {'coursenum': course['catalog_number'], 'subject': course['subject'],
-                          'name': courseInfo[0]['title'], 'desc': courseDesc[0]['description'],
-                          'units': courseInfo[0]['units'], 'prereq': courseDesc[0]['prerequisites'],
-                          'coreq': courseDesc[0]['corequisites'], 'antireq': courseDesc[0]['antirequisites'],
+                          'name': courseInfo[0]['title'], 'desc': courseDesc['description'],
+                          'units': courseInfo[0]['units'], 'prereq': courseDesc['prerequisites'],
+                          'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites'],
                           'notes': courseInfo[0]['note']}
-
-            #self.updateCourseDesc(courseDict)
-        #self.updateClasses(courseList)
+            self.updateCourseDesc(courseDict)
+        self.updateClasses(courseList)
 
     def scrapeTerms(self, uw):
         log.info("SCraping terms")
@@ -111,7 +110,7 @@ class UWaterloo(University):
         if self.settings['scrape']:
             while True:
                 try:
-                    uw = UWaterlooAPI(api_key="d4b5c3ce7b33a28074b86ab0bcf2d2c9")
+                    uw = UWaterlooAPI(api_key=self.settings['api_key'])
                     #print(dir(uw))
 
                     self.updateFaculties(uw)
