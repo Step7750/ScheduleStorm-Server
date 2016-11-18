@@ -26,9 +26,9 @@ class UWaterloo(University):
         courseList = []
 
         for subject in subjectList:
-            for course in uw.term_subject_schedule(1165, subject['subject']):
+            for course in uw.term_subject_schedule(term, subject['subject']):
                 for date in course['classes']:
-                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': 1165,
+                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': term,
                                   'id': course['class_number'], 'group': course['class_number'],
                                   'type': course['section'][:3], 'location': course['campus'],
                                   'rooms': [date['location']['building'], date['location']['room']],
