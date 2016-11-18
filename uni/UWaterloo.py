@@ -56,11 +56,14 @@ class UWaterloo(University):
                 courseList.append(courseDict)
 
             courseDesc = uw.course(course['subject'], course['catalog_number'])
-            courseDict = {'coursenum': course['catalog_number'], 'subject': course['subject'],
-                          'name': courseInfo[0]['title'], 'desc': courseDesc['description'],
-                          'units': courseInfo[0]['units'], 'prereq': courseDesc['prerequisites'],
-                          'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites'],
-                          'notes': courseInfo[0]['note']}
+            if len(courseDesc) != 0:
+                courseDict = {'coursenum': course['catalog_number'], 'subject': course['subject'],
+                              'name': courseInfo[0]['title'], 'desc': courseDesc['description'],
+                              'units': courseInfo[0]['units'], 'prereq': courseDesc['prerequisites'],
+                              'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites'],
+                              'notes': courseInfo[0]['note']}
+            else:
+                courseDict = {'coursenum': course['catalog_number'], 'subject': course['subject']}
             self.updateCourseDesc(courseDict)
         self.updateClasses(courseList)
 
@@ -120,11 +123,11 @@ class UWaterloo(University):
                     for term in terms:
                         log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
                         self.scrapeCourseList(uw, term)
+
                     log.info('Finished scraping for UWaterloo data')
                 except Exception as e:
                     log.info("There was a critical exception | " + str(e))
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
-
         else:
             log.info("Scraping is disabled")
