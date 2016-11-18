@@ -33,7 +33,8 @@ class UWaterloo(University):
                                   'id': course['class_number'], 'group': course['class_number'],
                                   'type': course['section'][:3], 'location': course['campus'],
                                   'rooms': [date['location']['building'], date['location']['room']],
-                                  'curEnroll': course['enrollment_capacity'], 'capEnroll': course['enrollment_total']}
+                                  'curEnroll': course['enrollment_capacity'], 'capEnroll': course['enrollment_total'],
+                                  'capwaitEnroll': course['waiting_capacity']}
                     if course['enrollment_total']/course['enrollment_capacity'] >= 1:
                         if course['waiting_capacity'] != 0:
                             courseDict['status'] = 'Wait List'
@@ -66,6 +67,7 @@ class UWaterloo(University):
                 else:
                     courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject']}
                 #self.updateCourseDesc(courseDict)
+        #print(courseList)
         #self.updateClasses(courseList)
 
     def scrapeTerms(self, uw):
