@@ -26,18 +26,22 @@ class UWaterloo(University):
         courseList = []
 
         for subject in subjectList:
-            courseInfo = uw.term_subject_schedule(term, subject['subject'])
-            #print(subject)
+            courseInfo = uw.term_subject_schedule(1165, subject['subject'])
             for course in courseInfo:
-                if subject['subject'] == 'ACC':
-                    print(course)
-                courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': term,
-                              'id': course['class_number'], 'group': course['class_number'],
-                              'type': course['section'][:3], 'location': course['campus'],
-                              'status': str(course['enrollment_total'])+'/' + str(course['enrollment_capacity'])}
-
                 for date in course['classes']:
-                    courseDict['rooms'] = [date['location']['building'], date['location']['room']]
+                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': 1165,
+                                  'id': course['class_number'], 'group': course['class_number'],
+                                  'type': course['section'][:3], 'location': course['campus'],
+                                  'rooms': [date['location']['building'], date['location']['room']],
+                                  'curEnroll': course['enrollment_capacity'], 'capEnroll': course['enrollment_total']}
+                    if course['enrollment_total']/course['enrollment_capacity'] >= 1:
+                        if course['waiting_capacity'] != 0:
+                            courseDict['status'] = 'Wait List'
+                            courseDict['waitEnroll'] = course['waiting_total']
+                        else:
+                            courseDict['status'] = 'Closed'
+                    else:
+                        courseDict['status'] = 'Open'
                     if date['date']['start_time']:
                         course_start_time = datetime.strptime(date['date']['start_time'], '%H:%M')
                         course_end_time = datetime.strptime(date['date']['end_time'], '%H:%M')
@@ -51,9 +55,7 @@ class UWaterloo(University):
                     else:
                         courseDict['instructor'] = ['N/A']
                     courseList.append(courseDict)
-                '''if len(course['classes']) > 1:
-                    print('ayy', courseDict)
-                    time.sleep(20)'''
+
                 courseDesc = uw.course(subject['subject'], course['catalog_number'])
                 if len(courseDesc) != 0:
                     courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'],
@@ -64,9 +66,6 @@ class UWaterloo(University):
                 else:
                     courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject']}
                 #self.updateCourseDesc(courseDict)
-            #print(len(courseInfo))
-            print('lmao', courseList)
-            #time.sleep(30)
         #self.updateClasses(courseList)
 
     def scrapeTerms(self, uw):
@@ -119,10 +118,9 @@ class UWaterloo(University):
             while True:
                 try:
                     uw = UWaterlooAPI(api_key=self.settings['api_key'])
-                    #print(dir(uw))
 
                     subjectList = self.updateFaculties(uw)
-                    #self.scrapeTerms(uw)
+                    self.scrapeTerms(uw)
                     terms = self.getTerms()
 
                     for term in terms:
