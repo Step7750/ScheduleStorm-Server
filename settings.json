@@ -41,11 +41,11 @@
         },
         "UWaterloo": {
             "fullname": "University of Waterloo",
-            "enabled": true,
-            "scrape": true,
+            "enabled": false,
+            "scrape": false,
             "scrapeinterval": 7200,
             "rmpid": 1490,
-            "api_key": "d4b5c3ce7b33a28074b86ab0bcf2d2c9"
+            "api_key": ""
         }
     },
     "rmpinterval": 21600
