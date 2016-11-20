@@ -7,13 +7,49 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 """
 
 from .University import University
-from uwaterlooapi import UWaterlooAPI
+import requests
+import json
 import logging
 import time
 import pymongo
 from datetime import datetime
 
 log = logging.getLogger("UWaterloo")
+
+
+class UWaterlooAPI():
+    def __init__(self, api_key=None, output='.json'):
+        self.api_key = '?key=' + api_key
+        self.baseURL = "https://api.uwaterloo.ca/v2"
+        self.format = output
+
+    def request(self, path):
+        r = requests.get(self.baseURL + path + self.format + self.api_key, timeout=20)
+        if r.status_code == requests.codes.ok:
+            return json.loads(r.text)['data']
+        else:
+            log.debug('Get request failed | ' + self.baseURL + path + self.format + self.api_key)
+        return True
+
+    def term_subject_schedule(self, term, subject):
+        path = '/terms/' + term + '/' + subject + '/schedule'
+        return self.request(path)
+
+    def terms(self):
+        path = '/terms/list'
+        return self.request(path)
+
+    def subject_codes(self):
+        path = '/codes/subjects'
+        return self.request(path)
+
+    def group_codes(self):
+        path = '/codes/groups'
+        return self.request(path)
+
+    def course(self, subject, catalog_number):
+        path = '/courses/' + subject + '/' + catalog_number + ''
+        return self.request(path)
 
 
 class UWaterloo(University):
@@ -70,7 +106,7 @@ class UWaterloo(University):
         #self.updateClasses(courseList)
 
     def scrapeTerms(self, uw):
-        log.info("SCraping terms")
+        log.info("Scraping terms")
         termDictList = []
         terms = uw.terms()
         termList = terms['listings']
