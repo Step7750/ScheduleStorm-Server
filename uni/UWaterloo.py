@@ -11,13 +11,14 @@ import requests
 import json
 import time
 import pymongo
+import threading
 from datetime import datetime
 
 
 # Custom UWaterlooAPI request class
-class UWaterlooAPI(University):
-    def __init__(self, settings, api_key=None, output='.json'):
-        super().__init__(settings)
+class UWaterlooAPI():
+    def __init__(self, log, api_key=None, output='.json'):
+        self.log = log
         self.api_key = '?key=' + api_key
         self.baseURL = "https://api.uwaterloo.ca/v2"
         self.format = output
@@ -104,7 +105,7 @@ class UWaterloo(University):
 
     def scrapeCourseList(self, uw, term, subjectList):
         """
-        Scrape and parsing for courses and class descriptions
+        Scrape and parsing for courses
 
         :param uw: **class object** UWaterlooapi class object
         :param term: **string** term id
@@ -153,24 +154,16 @@ class UWaterloo(University):
                         courseDict['times'] = ['N/A']
 
                     if date['instructors']:
-                        courseDict['teachers'] = date['instructors']
+                        teacher = date['instructors'][0].split(',')
+                        courseDict['teachers'] = [teacher[1] + ' ' + teacher[0]]
                     else:
                         courseDict['teachers'] = ['N/A']
                     courseList.append(courseDict)
 
-                # Gets class description
-                courseDesc = uw.course(subject['subject'], course['catalog_number'])
-                if len(courseDesc) != 0:
-                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'],
-                                  'name': course['title'], 'desc': courseDesc['description'],
-                                  'units': course['units'], 'prereq': courseDesc['prerequisites'],
-                                  'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites'],
-                                  'notes': course['note']}
-                else:
-                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject']}
-
-                # Upserts class descriptions
-                self.updateCourseDesc(courseDict)
+                if not self.getCourseDescription(courseDict['coursenum'], courseDict['subject']):
+                    threadm = CourseDescriptions(subject['subject'], course['catalog_number'], super(), uw)
+                    threadm.setDaemon(True)
+                    threadm.start()
 
         # Upserts class list
         self.updateClasses(courseList)
@@ -253,7 +246,7 @@ class UWaterloo(University):
             while True:
                 try:
                     # Initializes UWaterlooAPI class
-                    uw = UWaterlooAPI(api_key=self.settings['api_key'])
+                    uw = UWaterlooAPI(self.log, api_key=self.settings['api_key'])
 
                     # Scrapes faculties and terms
                     subjectList = self.updateFaculties(uw)
@@ -272,3 +265,33 @@ class UWaterloo(University):
                 time.sleep(self.settings["scrapeinterval"])
         else:
             self.log.info("Scraping is disabled")
+
+
+class CourseDescriptions(threading.Thread):
+    """
+        Mines course descriptions from the UWaterloo api given the subject and coursenum
+    """
+    def __init__(self, subject, coursenum, parent, uw):
+        threading.Thread.__init__(self)
+        self.super = parent
+        self.subject = subject
+        self.coursenum = coursenum
+        self.uw = uw
+
+    def run(self):
+        # Gets class description
+        courseDesc = self.uw.course(self.subject, self.coursenum)
+        if len(courseDesc) != 0:
+            courseDict = {'coursenum': self.coursenum, 'subject': self.subject,
+                          'name': courseDesc['title'], 'desc': courseDesc['description'],
+                          'units': courseDesc['units'], 'prereq': courseDesc['prerequisites'],
+                          'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites']}
+            if courseDesc['notes']:
+                note = courseDesc['notes'][7:]
+                note = note[:1]
+                courseDict['notes'] = note
+        else:
+            courseDict = {'coursenum': self.coursenum, 'subject': self.coursenum}
+
+        # Upserts class descriptions
+        self.super.updateCourseDesc(courseDict)
