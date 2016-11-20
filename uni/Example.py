@@ -7,17 +7,10 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 """
 
 from .University import University
-import logging
-import pymongo
-
-# Replace Uni Name with abbreviated name of university
-log = logging.getLogger("Uni Name")
 
 class Example(University):
     def __init__(self, settings):
         super().__init__(settings)
-        self.settings = settings
-        self.db = pymongo.MongoClient().ScheduleStorm
 
     def run(self):
         """
@@ -25,4 +18,4 @@ class Example(University):
 
         :return:
         """
-        log.info("Obtain course info here!")
+        self.log.info("Obtain course info here!")
