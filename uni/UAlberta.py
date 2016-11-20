@@ -11,19 +11,15 @@ import requests
 import pymongo
 from bs4 import BeautifulSoup
 import time
-import logging
 import re
 from ldap3 import Server, Connection, SUBTREE, ALL, LEVEL
 from queue import Queue
 from .University import University
 
-log = logging.getLogger("UAlberta")
-
 
 class UAlberta(University):
     def __init__(self, settings):
         super().__init__(settings)
-        self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
         self.db.UAlbertaProfessor.create_index([("uid", pymongo.ASCENDING)], unique=True)
@@ -51,7 +47,7 @@ class UAlberta(University):
         :return: **string**
         """
 
-        log.info('obtaining course descriptions')
+        self.log.info('obtaining course descriptions')
 
         # Page queries course descriptions with the search base
         searchBase = 'term=' + termid + ', ou=calendar, dc=ualberta, dc=ca'
@@ -181,7 +177,7 @@ class UAlberta(University):
         # We want to scrape professor names from their UID's
         q = Queue()
 
-        log.info("Filling up the Queue with Prof UIDs")
+        self.log.info("Filling up the Queue with Prof UIDs")
 
         # Fill queue with unique prof names
         queuedProfs = {}
@@ -206,7 +202,7 @@ class UAlberta(University):
         # Wait until the threads are done
         q.join()
 
-        log.info('Parsing course data')
+        self.log.info('Parsing course data')
 
         # for each entry in list, upsert course into db
         for entry in entry_list:
@@ -297,7 +293,7 @@ class UAlberta(University):
         :param conn: **ldap connection object**
         :return:
         """
-        log.info("Getting faculty list")
+        self.log.info("Getting faculty list")
 
         # Gets all recent terms and cycles through them
         for term in self.scrapeTerms(conn):
@@ -306,7 +302,7 @@ class UAlberta(University):
 
                 # Sets the search base for the query
                 searchBase = 'term='+term['id']+', ou=calendar, dc=ualberta, dc=ca'
-                log.info("Updating faculties with search base " + searchBase)
+                self.log.info("Updating faculties with search base " + searchBase)
 
                 # Page queries all faculties in current term
                 entry_list = conn.extend.standard.paged_search(search_base=searchBase,
@@ -323,7 +319,7 @@ class UAlberta(University):
                                        'faculty': entry['attributes']['faculty'],
                                        'name': entry['attributes']['subjectTitle']}
                         self.updateSubject(subjectDict)
-        log.info('Finished updating faculties')
+        self.log.info('Finished updating faculties')
 
     def run(self):
         """
@@ -347,18 +343,18 @@ class UAlberta(University):
 
                     # For each term, get the courses
                     for term in terms:
-                        log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
+                        self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
                         self.scrapeCourseList(conn, term)
                         self.scrapeCourseDesc(conn, term)
-                    log.info('Finished scraping for UAlberta data')
+                    self.log.info('Finished scraping for UAlberta data')
                     pass
                 except Exception as e:
-                    log.critical("There was an critical exception | " + str(e))
+                    self.log.critical("There was an critical exception | " + str(e))
 
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
         else:
-            log.info("Scraping is disabled")
+            self.log.info("Scraping is disabled")
 
 
 class UIDScraper(threading.Thread):
@@ -401,16 +397,16 @@ class UIDScraper(threading.Thread):
                                     professor = info
                                     break
 
-                            log.info('Adding UID ' + thisuid + ' to UAlbertaProfessor db, Name: ' + professor)
+                            self.log.info('Adding UID ' + thisuid + ' to UAlbertaProfessor db, Name: ' + professor)
 
                             # Upsert the data
                             self.db.UAlbertaProfessor.update({"uid": thisuid},
                                                              {'$set': {"uid": thisuid, "Name": professor}},
                                                              upsert=True)
                         else:
-                            log.error("Improper HTTP Status for UID " + thisuid)
+                            self.log.error("Improper HTTP Status for UID " + thisuid)
                     except:
-                        log.error("Failed to obtain name for " + thisuid)
+                        self.log.error("Failed to obtain name for " + thisuid)
 
                 # We're done with this class
                 self.q.task_done()
