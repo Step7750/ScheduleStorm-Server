@@ -288,7 +288,7 @@ class CourseDescriptions(threading.Thread):
                           'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites']}
             if courseDesc['notes']:
                 note = courseDesc['notes'][7:]
-                note = note[:1]
+                note = note[:-1]
                 courseDict['notes'] = note
         else:
             courseDict = {'coursenum': self.coursenum, 'subject': self.coursenum}
