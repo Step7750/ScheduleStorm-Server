@@ -9,17 +9,15 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 from .University import University
 import requests
 import json
-import logging
 import time
 import pymongo
 from datetime import datetime
 
-log = logging.getLogger("UWaterloo")
-
 
 # Custom UWaterlooAPI request class
-class UWaterlooAPI():
-    def __init__(self, api_key=None, output='.json'):
+class UWaterlooAPI(University):
+    def __init__(self, settings, api_key=None, output='.json'):
+        super().__init__(settings)
         self.api_key = '?key=' + api_key
         self.baseURL = "https://api.uwaterloo.ca/v2"
         self.format = output
@@ -38,7 +36,7 @@ class UWaterlooAPI():
         if r.status_code == requests.codes.ok:
             return json.loads(r.text)['data']
         else:
-            log.debug('Get request failed | ' + self.baseURL + path + self.format + self.api_key)
+            self.log.debug('Get request failed | ' + self.baseURL + path + self.format + self.api_key)
 
     def term_subject_schedule(self, term, subject):
         """
@@ -102,7 +100,6 @@ class UWaterlooAPI():
 class UWaterloo(University):
     def __init__(self, settings):
         super().__init__(settings)
-        self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
 
     def scrapeCourseList(self, uw, term, subjectList):
@@ -186,7 +183,7 @@ class UWaterloo(University):
         :return:
         """
 
-        log.info("Scraping terms")
+        self.log.info("Scraping terms")
         termDictList = []
 
         # Gets all terms recorded in UWaterlooAPI
@@ -214,7 +211,7 @@ class UWaterloo(University):
 
         # Upserts all terms to be scraped
         self.updateTerms(termDictList)
-        log.info('Finished scraping terms')
+        self.log.info('Finished scraping terms')
 
     def updateFaculties(self, uw):
         """
@@ -223,7 +220,7 @@ class UWaterloo(University):
         :param uw: **class object** UWaterlooapi class object
         :return subjectList: **list** list of all UWaterloo subjects
         """
-        log.info("Getting faculty list")
+        self.log.info("Getting faculty list")
 
         # Gets all faculty info
         faculties = uw.group_codes()
@@ -240,7 +237,7 @@ class UWaterloo(University):
 
         # Upserts all subjects at once
         self.updateSubjects(subjectList)
-        log.info('Finished updating faculties')
+        self.log.info('Finished updating faculties')
 
         # Returns a list of all subjects for future use
         return subjectList
@@ -265,13 +262,13 @@ class UWaterloo(University):
 
                     # For each term scrape course info
                     for term in terms:
-                        log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
+                        self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
                         self.scrapeCourseList(uw, term, subjectList)
 
-                    log.info('Finished scraping for UWaterloo data')
+                    self.log.info('Finished scraping for UWaterloo data')
                 except Exception as e:
-                    log.info("There was a critical exception | " + str(e))
+                    self.log.info("There was a critical exception | " + str(e))
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
         else:
-            log.info("Scraping is disabled")
+            self.log.info("Scraping is disabled")
