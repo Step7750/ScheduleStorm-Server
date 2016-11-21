@@ -139,6 +139,6 @@ if __name__ == '__main__':
     app.add_route('/v1/unis/{uni}/{term}/all', v1GetAllUniTermSubjects())
 
     # It is highly recommended to put this API behind a proxy such as nginx with heavy caching
-    log.info("Setting up API server on port 3000")
-    httpd = simple_server.make_server('0.0.0.0', 3000, app)
+    log.info("Setting up API server on port " + str(settings["port"]))
+    httpd = simple_server.make_server('0.0.0.0', settings["port"], app)
     httpd.serve_forever()

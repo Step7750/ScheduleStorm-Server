@@ -48,5 +48,6 @@
             "api_key": ""
         }
     },
-    "rmpinterval": 21600
+    "rmpinterval": 21600,
+    "port": 3000
 }

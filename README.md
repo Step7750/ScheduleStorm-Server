@@ -27,11 +27,11 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 
 Go through `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
 
-The default port is 3000, you can change this at the bottom of index.py
+The default port is 3000, you can change this in the settings file
 
 Simply execute (tested on Python 3.4+): `python index.py`
 
-You can browse the API by going to `http//localhost:3000/v1/unis` or `http://localhost:3000/v1/unis/{uni}/{term}/all`
+You can browse the API by going to `http//localhost:{port}/v1/unis` or `http://localhost:{port}/v1/unis/{uni}/{term}/all`
 
 If you'd like to use the front-end with your local API, clone it and change the URLs at the top of `ClassList.js` and `Welcome.js`
 
