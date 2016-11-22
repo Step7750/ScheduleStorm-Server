@@ -163,6 +163,10 @@ class UWaterloo(University):
                         courseDict['group'].append('99')
                         if courseDict['type'] == 'LEC' and course['related_component_2']:
                             courseDict['group'].append(course['related_component_2'])
+                    elif course['note'] == "Choose SEM section for Related 1." and (courseDict['type'] == 'LEC' or courseDict['type'] == 'SEM'):
+                        courseDict['group'].append('99')
+                        if courseDict['type'] == 'LEC' and course['related_component_2']:
+                            courseDict['group'].append(course['related_component_2'])
                     else:
                         if course['associated_class'] != 99:
                             courseDict['group'].append(str(course['associated_class']))
@@ -174,9 +178,6 @@ class UWaterloo(University):
 
                         if course['related_component_2']:
                             courseDict['group'].append(str(course['related_component_2']))
-                    if len(courseDict['group']) > 0:
-                        print(courseDict['subject'], courseDict['coursenum'], courseDict['type'], courseDict['group'])
-                        time.sleep(10)
                     courseList.append(courseDict)
 
                 if not self.getCourseDescription(courseDict['coursenum'], courseDict['subject']):
