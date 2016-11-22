@@ -126,11 +126,10 @@ class UWaterloo(University):
 
                     # initialize course dictionary
                     courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': term,
-                                  'id': course['class_number'], 'group': course['class_number'],
-                                  'type': course['section'][:3], 'location': course['campus'],
+                                  'id': course['class_number'], 'type': course['section'][:3], 'group': [],
+                                  'location': course['campus'], 'curEnroll': course['enrollment_capacity'],
                                   'rooms': [date['location']['building'], date['location']['room']],
-                                  'curEnroll': course['enrollment_capacity'], 'capEnroll': course['enrollment_total'],
-                                  'capwaitEnroll': course['waiting_capacity']}
+                                  'capEnroll': course['enrollment_total'], 'capwaitEnroll': course['waiting_capacity']}
 
                     # Checks if class is open, closed, or has a waiting list
                     if course['enrollment_capacity'] != 0 and course['enrollment_total']/course['enrollment_capacity'] >= 1:
@@ -153,11 +152,31 @@ class UWaterloo(University):
                     else:
                         courseDict['times'] = ['N/A']
 
+                    # Checks for assigned teacher
                     if date['instructors']:
                         teacher = date['instructors'][0].split(',')
                         courseDict['teachers'] = [teacher[1] + ' ' + teacher[0]]
                     else:
                         courseDict['teachers'] = ['N/A']
+
+                    if course['note'] == "Choose TUT section for Related 1." and (courseDict['type'] == 'LEC' or courseDict['type'] == 'TUT'):
+                        courseDict['group'].append('99')
+                        if courseDict['type'] == 'LEC' and course['related_component_2']:
+                            courseDict['group'].append(course['related_component_2'])
+                    else:
+                        if course['associated_class'] != 99:
+                            courseDict['group'].append(str(course['associated_class']))
+                        else:
+                            courseDict['group'].append(course['section'][4:])
+
+                        if course['related_component_1'] and course['related_component_1'] != "99":
+                            courseDict['group'].append(str(course['related_component_1']))
+
+                        if course['related_component_2']:
+                            courseDict['group'].append(str(course['related_component_2']))
+                    if len(courseDict['group']) > 0:
+                        print(courseDict['subject'], courseDict['coursenum'], courseDict['type'], courseDict['group'])
+                        time.sleep(10)
                     courseList.append(courseDict)
 
                 if not self.getCourseDescription(courseDict['coursenum'], courseDict['subject']):
