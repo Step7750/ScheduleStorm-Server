@@ -10,13 +10,12 @@ from .University import University
 import requests
 import json
 import time
-import pymongo
 import threading
 from datetime import datetime
 
 
 # Custom UWaterlooAPI request class
-class UWaterlooAPI():
+class UWaterlooAPI:
     def __init__(self, log, api_key=None, output='.json'):
         self.log = log
         self.api_key = '?key=' + api_key
@@ -55,8 +54,6 @@ class UWaterlooAPI():
         """
         Gets a list of all UWaterloo terms
 
-        :param term: **string** term id
-        :param subject: **string** subject abbreviation
         :return: **dict** all info for parsing
         """
 
@@ -67,8 +64,6 @@ class UWaterlooAPI():
         """
         Gets all UWaterloo subjects
 
-        :param term: **string** term id
-        :param subject: **string** subject abbreviation
         :return: **dict** all info for parsing
         """
 
@@ -85,23 +80,32 @@ class UWaterlooAPI():
         path = '/codes/groups'
         return self.request(path)
 
-    def course(self, subject, catalog_number):
+    def course_id(self, course_id):
+        """
+        Gets UWaterloo course descriptions based on unique course_id
+
+        :param course_id: **string** unique number assigned to a course
+        :return: **dict** all info for parsing
+        """
+
+        path = '/courses/' + course_id
+        return self.request(path)
+
+    def courses(self, subject):
         """
         Gets UWaterloo class descriptions based on subject and unique catalog_number
 
         :param subject: **string** subject abbreviation
-        :param catalog_number: **string** unique id number for class
         :return: **dict** all info for parsing
         """
 
-        path = '/courses/' + subject + '/' + catalog_number + ''
+        path = '/courses/' + subject
         return self.request(path)
 
 
 class UWaterloo(University):
     def __init__(self, settings):
         super().__init__(settings)
-        self.db = pymongo.MongoClient().ScheduleStorm
 
     def scrapeCourseList(self, uw, term, subjectList):
         """
@@ -112,7 +116,6 @@ class UWaterloo(University):
         :param subjectList: **list** list of all subjects
         :return:
         """
-
         courseList = []
 
         # For each subject scrape courses
@@ -159,15 +162,17 @@ class UWaterloo(University):
                     else:
                         courseDict['teachers'] = ['N/A']
 
-                    if course['note'] == "Choose TUT section for Related 1." and (courseDict['type'] == 'LEC' or courseDict['type'] == 'TUT'):
-                        courseDict['group'].append('99')
-                        if courseDict['type'] == 'LEC' and course['related_component_2']:
-                            courseDict['group'].append(course['related_component_2'])
-                    elif course['note'] == "Choose SEM section for Related 1." and (courseDict['type'] == 'LEC' or courseDict['type'] == 'SEM'):
-                        courseDict['group'].append('99')
-                        if courseDict['type'] == 'LEC' and course['related_component_2']:
-                            courseDict['group'].append(course['related_component_2'])
-                    else:
+                    matched = False
+
+                    for classType in ['LAB', 'TUT', 'SEM', 'TST']:
+                        if course['note'] == "Choose " + classType + " section for Related 1." and \
+                                (courseDict['type'] == 'LEC' or courseDict['type'] == classType):
+                            courseDict['group'].append('99')
+                            if courseDict['type'] == 'LEC' and course['related_component_2']:
+                                courseDict['group'].append(course['related_component_2'])
+                            matched = True
+
+                    if not matched:
                         if course['associated_class'] != 99:
                             courseDict['group'].append(str(course['associated_class']))
                         else:
@@ -180,8 +185,9 @@ class UWaterloo(University):
                             courseDict['group'].append(str(course['related_component_2']))
                     courseList.append(courseDict)
 
-                if not self.getCourseDescription(courseDict['coursenum'], courseDict['subject']):
-                    threadm = CourseDescriptions(subject['subject'], course['catalog_number'], super(), uw)
+            for course in uw.courses(subject['subject']):
+                if not self.getCourseDescription(course['catalog_number'], course['subject']):
+                    threadm = CourseDescriptions(course['course_id'], super(), uw)
                     threadm.setDaemon(True)
                     threadm.start()
 
@@ -291,18 +297,18 @@ class CourseDescriptions(threading.Thread):
     """
         Mines course descriptions from the UWaterloo api given the subject and coursenum
     """
-    def __init__(self, subject, coursenum, parent, uw):
+    def __init__(self, course, parent, uw):
         threading.Thread.__init__(self)
         self.super = parent
-        self.subject = subject
-        self.coursenum = coursenum
+        self.course = course
         self.uw = uw
 
     def run(self):
         # Gets class description
-        courseDesc = self.uw.course(self.subject, self.coursenum)
+        courseDesc = self.uw.course_id(self.course)
+
         if len(courseDesc) != 0:
-            courseDict = {'coursenum': self.coursenum, 'subject': self.subject,
+            courseDict = {'coursenum': courseDesc['catalog_number'], 'subject':  courseDesc['subject'],
                           'name': courseDesc['title'], 'desc': courseDesc['description'],
                           'units': courseDesc['units'], 'prereq': courseDesc['prerequisites'],
                           'coreq': courseDesc['corequisites'], 'antireq': courseDesc['antirequisites']}
@@ -311,7 +317,7 @@ class CourseDescriptions(threading.Thread):
                 note = note[:-1]
                 courseDict['notes'] = note
         else:
-            courseDict = {'coursenum': self.coursenum, 'subject': self.coursenum}
+            courseDict = {'coursenum': courseDesc['catalog_number'], 'subject': courseDesc['subject']}
 
         # Upserts class descriptions
         self.super.updateCourseDesc(courseDict)
