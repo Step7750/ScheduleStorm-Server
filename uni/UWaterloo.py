@@ -171,8 +171,6 @@ class UWaterloo(University):
                         startType = courseDict['type']
                         group.append(course['associated_class'])
                         courseDict['group'].append(course['associated_class'])
-                        if course['related_component_1']:
-                            courseDict['group'].append(course['related_component_1'])
                     else:
                         if int(course['associated_class']) != 99:
                             courseDict['group'].append(course['associated_class'])
@@ -186,7 +184,13 @@ class UWaterloo(University):
         self.updateClasses(courseList)
 
     def scrapeCourseDesc(self, subjectList, uw):
+        """
+        Cycles through the subjectlist scraping course descriptions
 
+        :param subjectList: **List** list of all subjects
+        :param uw: **Class Object** UWaterlooapi class object
+        :return:
+        """
         self.log.info("Scraping course descriptions")
 
         for subject in subjectList:
