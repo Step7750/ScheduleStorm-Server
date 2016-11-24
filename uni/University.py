@@ -67,6 +67,10 @@ class University(threading.Thread):
             ("uni", pymongo.ASCENDING)],
             unique=True)
 
+        self.db.ClassList.create_index([
+            ("term", pymongo.ASCENDING),
+            ("uni", pymongo.ASCENDING)])
+
     def getLocations(self):
         """
         API Handler
