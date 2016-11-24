@@ -116,14 +116,19 @@ class UWaterloo(University):
         :param subjectList: **list** list of all subjects
         :return:
         """
-        courseList = []
 
+        self.log.info('Scraping classes')
+        prevClass = ''
+        startType = ''
+        courseList = []
         # For each subject scrape courses
         for subject in subjectList:
 
             # Gets all courses based on term and subject
             for course in uw.term_subject_schedule(term, subject['subject']):
 
+                if course['catalog_number'] != prevClass or prevClass == '':
+                    group = []
                 # For each class initialize course dictionary to be upserted
                 for date in course['classes']:
 
@@ -162,37 +167,34 @@ class UWaterloo(University):
                     else:
                         courseDict['teachers'] = ['N/A']
 
-                    matched = False
-
-                    for classType in ['LAB', 'TUT', 'SEM', 'TST']:
-                        if course['note'] == "Choose " + classType + " section for Related 1." and \
-                                (courseDict['type'] == 'LEC' or courseDict['type'] == classType):
-                            courseDict['group'].append('99')
-                            if courseDict['type'] == 'LEC' and course['related_component_2']:
-                                courseDict['group'].append(course['related_component_2'])
-                            matched = True
-
-                    if not matched:
-                        if course['associated_class'] != 99:
-                            courseDict['group'].append(str(course['associated_class']))
+                    if prevClass != courseDict['coursenum'] or (prevClass == courseDict['coursenum'] and courseDict['type'] == startType):
+                        startType = courseDict['type']
+                        group.append(course['associated_class'])
+                        courseDict['group'].append(course['associated_class'])
+                        if course['related_component_1']:
+                            courseDict['group'].append(course['related_component_1'])
+                    else:
+                        if int(course['associated_class']) != 99:
+                            courseDict['group'].append(course['associated_class'])
                         else:
-                            courseDict['group'].append(course['section'][4:])
+                            courseDict['group'] = group
 
-                        if course['related_component_1'] and course['related_component_1'] != "99":
-                            courseDict['group'].append(str(course['related_component_1']))
-
-                        if course['related_component_2']:
-                            courseDict['group'].append(str(course['related_component_2']))
+                    prevClass = courseDict['coursenum']
                     courseList.append(courseDict)
 
+        # Upserts class list
+        self.updateClasses(courseList)
+
+    def scrapeCourseDesc(self, subjectList, uw):
+
+        self.log.info("Scraping course descriptions")
+
+        for subject in subjectList:
             for course in uw.courses(subject['subject']):
                 if not self.getCourseDescription(course['catalog_number'], course['subject']):
                     threadm = CourseDescriptions(course['course_id'], super(), uw)
                     threadm.setDaemon(True)
                     threadm.start()
-
-        # Upserts class list
-        self.updateClasses(courseList)
 
     def scrapeTerms(self, uw):
         """
@@ -283,6 +285,7 @@ class UWaterloo(University):
                     for term in terms:
                         self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
                         self.scrapeCourseList(uw, term, subjectList)
+                        self.scrapeCourseDesc(subjectList, uw)
 
                     self.log.info('Finished scraping for UWaterloo data')
                 except Exception as e:
