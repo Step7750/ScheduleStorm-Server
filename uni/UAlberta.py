@@ -195,7 +195,7 @@ class UAlberta(University):
 
         # Start up the threads
         for i in range(self.settings["uidConcurrency"]):
-            concurrentScraper = UIDScraper(q, self.db)
+            concurrentScraper = UIDScraper(q, self.db, self.log)
             concurrentScraper.daemon = True
             concurrentScraper.start()
 
@@ -362,10 +362,11 @@ class UIDScraper(threading.Thread):
     Thread that gets UID's from the passed in queue and inserts the prof's data from UAlberta
     """
 
-    def __init__(self, q, db):
+    def __init__(self, q, db, log):
         threading.Thread.__init__(self)
         self.q = q
         self.db = db
+        self.log = log
 
     def run(self):
         """
