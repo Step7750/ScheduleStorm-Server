@@ -239,9 +239,8 @@ class UAlberta(University):
 
             # for entry in list, match the days, startTime, endTime, and locations to course
             for entry_times in times_list:
-
+                
                 if entry_times['attributes']['class'] == courseList['id']:
-
                     # Combines day, startTime, endTime into a duration
                     duration = " "
                     duration = duration.join(
@@ -314,7 +313,7 @@ class UAlberta(University):
 
                 # For each entry in list updates the faculty
                 for entry in entry_list:
-                    if 'subject' in entry['attributes']:
+                    if 'subject' in entry['attributes'] and entry['attributes']['faculty'] != "St Joseph's College":
                         subjectDict = {'subject': entry['attributes']['subject'],
                                        'faculty': entry['attributes']['faculty'],
                                        'name': entry['attributes']['subjectTitle']}
