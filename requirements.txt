@@ -3,3 +3,5 @@ ldap3==1.4.0
 pymongo==3.3.0
 beautifulsoup4==4.5.1
 Requests==2.12.1
+html5lib==0.999999999
+lxml==3.7.0

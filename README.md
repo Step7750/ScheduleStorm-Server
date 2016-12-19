@@ -20,6 +20,8 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 * ldap 3
 * pymongo
 * falcon
+* html5lib
+* lxml
 
 #### You can automatically install the dependencies using `pip install -r requirements.txt`
 
