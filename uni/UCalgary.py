@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import re
 import time
 import logging
+import traceback
 from .University import University
 
 
@@ -119,10 +120,9 @@ class UCalgary(University):
 
         :return: **list** List of terms if the request was successful, False is not
         """
-        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/STUDENT/CAMPUS/c/"
-                                  "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART&"
-                                  "Action=A&ACAD_CAREER=CAR&EMPLID=" + self.settings["ucid"] +
-                                  "&ENRL_REQUEST_ID=&INSTITUTION=INST&STRM=TERM",
+        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                  "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART"
+                                  "&Action=A&ExactKeys=Y&TargetFrameName=None",
                                   verify=verifyRequests,
                                   allow_redirects=False)
 
@@ -306,6 +306,18 @@ class UCalgary(University):
             # We probably have the data we want
             self.parseRawCourseList(courselist.text, subjectid, termid)
 
+            # get the new search page again
+            payload = self.getHiddenInputPayload(courselist.text)
+
+            payload["ICAction"] = "CLASS_SRCH_WRK2_SSR_PB_NEW_SEARCH"
+            payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$7$"] = 9999
+            payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$"] = 9999
+
+            self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/"
+                                    "CAMPUS/c/SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL",
+                                   data=payload, verify=verifyRequests, timeout=40)
+
+
     def parseRawCourseList(self, courselist, subjectid, termid):
         """
         Parses the raw HTML of the course list and upsets each course in the DB
@@ -315,22 +327,24 @@ class UCalgary(University):
         :return:
         """
 
-        soup = BeautifulSoup(courselist, 'lxml')
+        soup = BeautifulSoup(courselist, 'html5lib')
 
         # If true, we are already obtaining descriptions for this subject, no need to make another thread
         obtainingDescriptions = False
 
         # Iterate through the courses
         for course in soup.findAll("div", {"id": re.compile('win0divSSR_CLSRSLT_WRK_GROUPBOX2\$\d*')}):
-
             coursename = course.find("div", {"id": re.compile('win0divSSR_CLSRSLT_WRK_GROUPBOX2GP\$\d*')}).text.strip()
+
+            log.debug(coursename)
 
             subid = coursename.split("  ")[0]  # Subject ID
 
             if subid != subjectid:
                 # We didn't receive the data we want, this shouldn't be happening
-                log.error("Incorrect subject data returned for " + subjectid + " while parsing " + str(termid) + ": " +
+                log.error("Incorrect subject returned for " + subjectid + " while parsing " + str(termid) + ": " +
                     subid)
+                continue
 
             splitname = coursename.split(" - ")
             coursenum = splitname[0].split("  ")[1]  # Course number
@@ -338,12 +352,10 @@ class UCalgary(University):
 
             # Find the possible classes in this course
             for classdiv in course.findAll("table", {"id": re.compile('ACE_SSR_CLSRSLT_WRK_GROUPBOX3\$\d*')}):
-
                 classid = classdiv.find("div", {"id": re.compile('win0divMTG_CLASSNAME\$\d*')}).text.strip()
+                scheduletype = " ".join(classid.split("\n")[1:])  # Regular, LabWeek, etc...
 
-                scheduletype = " ".join(classid.split(" ")[1:])  # Regular, LabWeek, etc...
-
-                type = classid.split(" ")[0].split("-")[1]  # Lab, Lec etc...
+                type = classid.split("\n")[0].split("-")[1]  # Lab, Lec etc...
 
                 # Figure out if there are class restrictions
                 restriction = False
@@ -362,20 +374,16 @@ class UCalgary(University):
                     "coursenum": coursenum,
                     "id": int(classdiv.find("div", {"id": re.compile('win0divMTG_CLASS_NBR\$\d*')}).text.strip()),
                     "term": int(termid),
-                    "times": classdiv.find("div", {"id": re.compile('win0divMTG_DAYTIME\$\d*')}).text.strip().split("\r"),
+                    "times": classdiv.find("div", {"id": re.compile('win0divMTG_DAYTIME\$\d*')}).text.strip().split("\n"),
                     "location": classdiv.find("div", {"id": re.compile('win0divUCSS_E010_WRK_DESCR\$\d*')}).text.strip(),
-                    "rooms": classdiv.find("div", {"id": re.compile('win0divMTG_ROOM\$\d*')}).text.strip().split("\r"),
-                    "teachers": classdiv.find("div", {"id": re.compile('win0divMTG_INSTR\$\d*')}).text.strip().split("\r"),
+                    "rooms": classdiv.find("div", {"id": re.compile('win0divMTG_ROOM\$\d*')}).text.strip().split("\n"),
+                    "teachers": classdiv.find("div", {"id": re.compile('win0divMTG_INSTR\$\d*')}).text.strip().replace(", ", "").split("\n"),
                     "group": classdiv.find("div", {"id": re.compile('win0divUCSS_E010_WRK_ASSOCIATED_CLASS\$\d*')}).text.strip(),
                     "status": classdiv.find("div", {"id": re.compile('win0divDERIVED_CLSRCH_SSR_STATUS_LONG\$\d*')}).find("img")["alt"],
                     "restriction": restriction
                 }
 
-                # Add in potential class notes
-                notes = classdiv.find("div", {"id": re.compile('win0divDERIVED_CLSRCH_DESCRLONG\$\d*')}).text.strip('\xa0')
-
-                if len(notes) > 1:
-                    classdict["notes"] = notes.strip()
+                log.debug(classdict)
 
                 # Remove whitespace and commas from teacher names
                 for teacher in range(len(classdict["teachers"])):
@@ -408,6 +416,7 @@ class UCalgary(University):
                 }
 
                 self.updateCourseDesc(classdesc)
+
 
     def updateFaculties(self):
         # Get the list
@@ -495,7 +504,8 @@ class UCalgary(University):
                                 self.getTermCourses(self.termNameToID(term))
 
                 except Exception as e:
-                    log.critical("There was an critical exception | " + str(e))
+                    log.critical("CHECK EXCEPTION")
+                    traceback.print_exc()
 
                 # Sleep for the specified interval
                 time.sleep(self.settings["scrapeinterval"])
