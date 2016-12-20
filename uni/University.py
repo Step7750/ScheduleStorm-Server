@@ -39,6 +39,7 @@ class University(threading.Thread):
         self.settings = settings
         self.db = pymongo.MongoClient().ScheduleStorm
         self.log = logging.getLogger(self.settings["uniID"])
+        self.isScraping = False
         self.ensureIndexes()
 
     def ensureIndexes(self):
@@ -521,12 +522,16 @@ class University(threading.Thread):
             while True:
                 self.log.info("Starting to scrape updated course info")
 
+                self.isScraping = True
+
                 try:
                     self.scrape()
                 except Exception as e:
                     print_exc()
 
                 self.log.info("Done scraping, sleeping for " + str(self.settings["scrapeinterval"]) + "s")
+
+                self.isScraping = False
 
                 # Sleep for the specified interval
                 sleep(self.settings["scrapeinterval"])

@@ -44,7 +44,8 @@ class v1Unis():
             responsedict[uni] = {"terms": uniThreads[uni].getTerms(),
                                  "locations": uniThreads[uni].getLocations(),
                                  "name": settings["Universities"][uni]["fullname"],
-                                 "rmp": settings["Universities"][uni]["rmpid"]}
+                                 "rmp": settings["Universities"][uni]["rmpid"],
+                                 "scraping": uniThreads[uni].isScraping}
         str_response = json.dumps(responsedict).encode('utf-8')
 
         # set the etag and body
