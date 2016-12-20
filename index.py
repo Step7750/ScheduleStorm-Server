@@ -60,14 +60,25 @@ class v1GetAllUniTermSubjects():
     def on_get(self, req, resp, uni, term):
         # The term must be a string since the threads represent them as such
         if uni in uniThreads and term in uniThreads[uni].getTerms():
-            subject_list = json.dumps(uniThreads[uni].getSubjectListAll(term), sort_keys=True).encode('utf-8')
+            if uniThreads[uni].isScraping:
+                # we don't want to return data while scraping, send error (configure nginx to send stale data if it can)
+                resp.status = falcon.HTTP_400
+                resp.body = json.dumps(
+                    {"error": "We're currently scraping this university, please check back in a couple minutes!"}
+                ).encode('utf-8')
+            else:
+                # Get course/subject list
+                subject_list = json.dumps(uniThreads[uni].getSubjectListAll(term), sort_keys=True).encode('utf-8')
 
-            # set the etag and body
-            resp.etag = "W/" + hashlib.sha1(subject_list).hexdigest()
-            resp.body = subject_list
+                # set the etag and body
+                resp.etag = "W/" + hashlib.sha1(subject_list).hexdigest()
+                resp.body = subject_list
         else:
-            raise falcon.HTTPBadRequest('Resource Not Found',
-                                        'The specified university or term was not found')
+            # Couldn't find the uni or term, send error
+            resp.status = falcon.HTTP_400
+            resp.body = json.dumps(
+                {"error": "The specified university or term was not found"}
+            ).encode('utf-8')
 
 if __name__ == '__main__':
 
