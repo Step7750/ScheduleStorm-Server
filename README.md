@@ -55,15 +55,16 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 ```javascript
 {
     "Universities": {
-    	...
+        ...
         "<uniID>": {
             "fullname": "<University Name>"
             "enabled": true,
-	    	"scrape": true,
+            "scrape": true,
+            "scrapeinterval": 7200,
             "rmpid": <rmpid>,
-	    ...
+        ...
         },
-	...
+    ...
 ```
 
 | key       | Type   | Optional | Notes
@@ -72,7 +73,9 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 | fullname  | string | No       | Full name of the university shown to the user (ex. University of Calgary)
 | enabled   | bool   | No       | Boolean as to whether this university is enabled or not
 | scrape    | bool   | No       | If true, starts the university thread to fetch updated course info
+| scrapeinterval | int | No     | Amount of seconds to sleep between subsequent scrapes
 | rmpid     | int    | Yes      | RMP ID of the University to fetch professor data from
+
 
 
 Within the university's JSON block, you can have as many more attributes as you'd like. Here, you can specify usernames, passwords, api keys, and they'll all be passed to your University thread upon creation.
@@ -111,17 +114,15 @@ class UCalgary(University):
     def __init__(self, settings):
         super().__init__(settings)
 
-    def run(self):
+    def scrape(self):
         """
-        Scraping thread that obtains updated course info
+        Scraping function that obtains updated course info
         :return:
         """
         self.log.info("Obtain course info here!")
 ```
 
-**Within the run method, you should fetch updated course data**
-
-It is highly recommended that you set a scraping interval within your settings file to pause the scraping every X seconds after it is finished before scraping again.
+**Within the scrape method, you should fetch updated course data**
 
 # Terms
 
@@ -220,7 +221,7 @@ Course Description Objects are dictionaries with the specified keys
 | coreq     | string | Yes      | No     | Human-readable course corequisites (ex. "Must take CPSC 301 with this course")
 | antireq   | string | Yes      | No     | Human-readable course antirequisites (ex. "Student must not have taken CPSC 302")
 | notes     | string | Yes      | No     | Any further human-readable notes for this class (ex. "You might learn too much!")
-| aka 	    | string | Yes	| No 	 | Equivalent/old names for this class (ex. "Formally CPSC 234")
+| aka       | string | Yes      | No     | Equivalent/old names for this class (ex. "Formally CPSC 234")
 
 The coursenum and subject fields together form a unique constraint.
 
@@ -231,7 +232,7 @@ Arguments:
 
 | name      | Type   | Optional | Notes
 | --------- | ------ | -------- | ------ |
-| coursedesc | dict   | No       | Course description object to update in the DB
+| coursedesc| dict  | No       | Course description object to update in the DB
 
 Updates the course description specified into the DB. If the course description doesn't exist in the DB yet, it is inserted.
 
@@ -263,13 +264,13 @@ Class Objects are dictionaries with the specified keys
 | times     | list   | No       | No     | List of strings that contain the times in which this class is (ex. ["MWF 12:00PM - 2:00PM"]). If there are no times, set it to ["TBA"] or ["N/A"]. See below for time formatting.
 | group     | list   | No       | No     | Group(s) of this class (ex. ["1", "2"]). See below for further details.
 | status    | string | No       | No     | If the class is open, set to "Open", otherwise, set the enrollment status to "Closed" or "Wait List"
-| location  | string | No  		| No 	 | Location of the class (ex. "Main Campus")
+| location  | string | No       | No     | Location of the class (ex. "Main Campus")
 | section   | string | Yes      | No     | Shows this value instead of `group` to the user when applicable 
 | restriction | bool | Yes      | No     | True if this class has a restriction to some students
-| curEnroll | int 	 | Yes 		| No 	 | Amount of students currently enrolled in the class
-| capEnroll | int    | Yes   	| No 	 | Maximum amount of students that are able to be enrolled in the class
-| waitEnroll | int   | Yes  	| No 	 | Amount of students waitlisted to take the course
-| capwaitEnroll | int | Yes 	| No 	 | Total amount of students that can waitlist the course
+| curEnroll | int    | Yes      | No     | Amount of students currently enrolled in the class
+| capEnroll | int    | Yes      | No     | Maximum amount of students that are able to be enrolled in the class
+| waitEnroll | int   | Yes      | No     | Amount of students waitlisted to take the course
+| capwaitEnroll | int | Yes     | No     | Total amount of students that can waitlist the course
 
 ### `group` Attribute
 
@@ -294,33 +295,33 @@ Each time for a given class must be in the specified format:
 ### `<DaysOfTheWeek> <StartTime><AM/PM> - <EndTime><AM/PM>`
 
 * Days of the Week
-	* Concatenated series of days in which this time is applicable
-	* Possible Days
-		* M/Mo - Monday
-		* T/Tu - Tuesday
-		* W/We - Wednesday
-		* R/Th - Thursday
-		* F/Fr - Friday
-		* S/Sa - Saturday 
-		* U/Su - Sunday
-	* Examples
-		* "M"
-		* "MTR"
-		* "FWM"
-	* Order of the days does not matter
+    * Concatenated series of days in which this time is applicable
+    * Possible Days
+        * M/Mo - Monday
+        * T/Tu - Tuesday
+        * W/We - Wednesday
+        * R/Th - Thursday
+        * F/Fr - Friday
+        * S/Sa - Saturday 
+        * U/Su - Sunday
+    * Examples
+        * "M"
+        * "MTR"
+        * "FWM"
+    * Order of the days does not matter
 
 * StartTime/EndTime
-	* 12-hour Start/End time
-	* Format: `<Hour>:<Minutes>`
-	* Examples
-		* "12:00"
-		* "1:23"
+    * 12-hour Start/End time
+    * Format: `<Hour>:<Minutes>`
+    * Examples
+        * "12:00"
+        * "1:23"
 
 * Examples
-	* "TR 12:00PM - 1:20PM"
-	* "MWF 9:50AM - 10:30AM"
-	* "MoWeFr 9:00AM - 11:00AM"
-	* "MoTWe 2:00PM - 3:00PM"
+    * "TR 12:00PM - 1:20PM"
+    * "MWF 9:50AM - 10:30AM"
+    * "MoWeFr 9:00AM - 11:00AM"
+    * "MoTWe 2:00PM - 3:00PM"
 
 ## Class Methods
 
@@ -346,11 +347,10 @@ Updates the class specified into the DB. If the class doesn't exist in the DB ye
 # General Tips When Adding a University
 
 * Don't use print statements, the `University` superclass contains a [`logger`](https://docs.python.org/3.5/library/logging.html#logger-objects), you can use it with `self.log`
-	* Examples
-		* `self.log.error("You can't do this")`
-		* `self.log.info("Scraping courses")`
+    * Examples
+        * `self.log.error("You can't do this")`
+        * `self.log.info("Scraping courses")`
 * You can access your uni settings object with `self.settings` within the uni class
-* Add a `scrapeinterval` in your settings file and add a delay between successful scraping sessions using `time.sleep(self.settings["scrapeinterval"])`
 * Look at `Example.py` for a starting point, make sure you edit the settings file though!
 * If you want to add more attributes to a class/subject/term/coursedesc object, go ahead! They won't be used by the front-end, but we can add support for it later on!
 * If you have any questions/concerns, feel free to file an issue or talk to us!

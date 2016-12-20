@@ -268,37 +268,27 @@ class UWaterloo(University):
         # Returns a list of all subjects for future use
         return subjectList
 
-    def run(self):
+    def scrape(self):
         """
-        Scraping thread that obtains updated course info
+        Scraping function that obtains updated course info
 
         :return:
         """
+        # Initializes UWaterlooAPI class
+        uw = UWaterlooAPI(self.log, api_key=self.settings['api_key'])
 
-        if self.settings['scrape']:
-            while True:
-                try:
-                    # Initializes UWaterlooAPI class
-                    uw = UWaterlooAPI(self.log, api_key=self.settings['api_key'])
+        # Scrapes faculties and terms
+        subjectList = self.updateFaculties(uw)
+        self.scrapeTerms(uw)
+        terms = self.getTerms()
 
-                    # Scrapes faculties and terms
-                    subjectList = self.updateFaculties(uw)
-                    self.scrapeTerms(uw)
-                    terms = self.getTerms()
+        # For each term scrape course info
+        for term in terms:
+            self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
+            self.scrapeCourseList(uw, term, subjectList)
+            self.scrapeCourseDesc(subjectList, uw)
 
-                    # For each term scrape course info
-                    for term in terms:
-                        self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
-                        self.scrapeCourseList(uw, term, subjectList)
-                        self.scrapeCourseDesc(subjectList, uw)
-
-                    self.log.info('Finished scraping for UWaterloo data')
-                except Exception as e:
-                    self.log.info("There was a critical exception | " + str(e))
-                # Sleep for the specified interval
-                time.sleep(self.settings["scrapeinterval"])
-        else:
-            self.log.info("Scraping is disabled")
+        self.log.info('Finished scraping for UWaterloo data')
 
 
 class CourseDescriptions(threading.Thread):

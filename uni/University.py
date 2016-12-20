@@ -9,6 +9,8 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 import threading
 import pymongo
 import logging
+from time import sleep
+from traceback import print_exc
 
 
 class University(threading.Thread):
@@ -508,5 +510,23 @@ class University(threading.Thread):
         # Send over a list of all the professors with a RMP rating in the list
         return {"classes": responsedict, "rmp": rmpobj}
 
+    def scrape(self):
+        self.log.critical("You must override the scrape method!")
+
     def run(self):
-        self.log.critical("You must overwrite the run method")
+        if "scrapeinterval" not in self.settings or not isinstance(self.settings["scrapeinterval"], int) \
+                or self.settings["scrapeinterval"] < 0:
+            self.log.critical("No 'scrapeinterval' set, aborting")
+        else:
+            while True:
+                self.log.info("Starting to scrape updated course info")
+
+                try:
+                    self.scrape()
+                except Exception as e:
+                    print_exc()
+
+                self.log.info("Done scraping, sleeping for " + str(self.settings["scrapeinterval"]) + "s")
+
+                # Sleep for the specified interval
+                sleep(self.settings["scrapeinterval"])

@@ -329,44 +329,39 @@ class ULeth(University):
         else:
             self.log.error("Failed to obtain course descriptions")
 
-    def run(self):
-        while True:
-            try:
-                self.log.info("Starting Scraping")
+    def scrape(self):
+        """
+        Scrapes and updates the DB with updated course info
 
-                # Get the terms
-                terms = self.getWebTerms()
+        :return:
+        """
+        # Get the terms
+        terms = self.getWebTerms()
 
-                if terms:
-                    # Update the terms in the DB
-                    self.updateTerms(terms)
+        if terms:
+            # Update the terms in the DB
+            self.updateTerms(terms)
 
-                    for term in terms:
-                        # Get the subjects for this term
-                        term_id = term["id"]
+            for term in terms:
+                # Get the subjects for this term
+                term_id = term["id"]
 
-                        self.log.info("Scraping class data for " + str(term_id))
+                self.log.info("Scraping class data for " + str(term_id))
 
-                        # Get the subject list for this term
-                        subjects = self.getWebSubjects(term_id)
+                # Get the subject list for this term
+                subjects = self.getWebSubjects(term_id)
 
-                        # update the subjects in the DB
-                        self.updateSubjects(subjects)
+                # update the subjects in the DB
+                self.updateSubjects(subjects)
 
-                        # For each subject, get the class data
-                        for subject in subjects:
-                            classes = self.getWebSubjectClasses(subject["subject"], term_id)
-                            self.parseClassHTML(classes, term_id)
+                # For each subject, get the class data
+                for subject in subjects:
+                    classes = self.getWebSubjectClasses(subject["subject"], term_id)
+                    self.parseClassHTML(classes, term_id)
 
-                        self.log.info("Done scraping class data for " + str(term_id))
+                self.log.info("Done scraping class data for " + str(term_id))
 
-                    self.updateClassDescriptions()
+            self.updateClassDescriptions()
 
-                self.log.info("Done scraping")
-
-            except Exception as e:
-                self.log.critical("CHECK EXCEPTION")
-                traceback.print_exc()
-
-            time.sleep(self.settings["scrapeinterval"])
+        self.log.info("Done scraping")
 

@@ -622,48 +622,33 @@ class MTRoyal(University):
 
             self.updateSubject(subjectdict)
 
-    def run(self):
+    def scrape(self):
         """
         Scraping thread that obtains updated course info
 
         :return:
         """
+        if self.login():
+            # Get the terms
+            terms = self.obtainActiveTerms()
 
-        if self.settings["scrape"]:
-            while True:
+            log.debug(terms)
 
-                try:
-                    log.info("Scraping now")
-                    if self.login():
-                        # Get the terms
-                        terms = self.obtainActiveTerms()
+            if terms:
+                for term in terms:
+                    # Get the subjects
+                    termsubjects = self.getSubjectsForTerm(term)
 
-                        log.debug(terms)
+                    if termsubjects is not False:
+                        # Update the DB listings for the subjects
+                        self.updateSubjects(termsubjects)
 
-                        if terms:
-                            for term in terms:
-                                # Get the subjects
-                                termsubjects = self.getSubjectsForTerm(term)
+                        # Get the class data for the previous subjects
+                        classdata = self.getTermClasses(term, termsubjects)
 
-                                if termsubjects is not False:
-                                    # Update the DB listings for the subjects
-                                    self.updateSubjects(termsubjects)
-
-                                    # Get the class data for the previous subjects
-                                    classdata = self.getTermClasses(term, termsubjects)
-
-                                    # If we got class data, parse it
-                                    if classdata:
-                                        self.parseClassList(classdata, term)
-
-                except Exception as e:
-                    log.critical("CHECK EXCEPTION")
-                    traceback.print_exc()
-
-                # Sleep for the specified interval
-                time.sleep(self.settings["scrapeinterval"])
-        else:
-            log.info("Scraping is disabled")
+                        # If we got class data, parse it
+                        if classdata:
+                            self.parseClassList(classdata, term)
 
 
 class CourseDescriptions(threading.Thread):

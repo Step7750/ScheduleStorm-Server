@@ -12,9 +12,9 @@ class Example(University):
     def __init__(self, settings):
         super().__init__(settings)
 
-    def run(self):
+    def scrape(self):
         """
-        Scraping thread that obtains updated course info
+        Scraping function that obtains updated course info
 
         :return:
         """

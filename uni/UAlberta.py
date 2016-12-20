@@ -320,40 +320,29 @@ class UAlberta(University):
                         self.updateSubject(subjectDict)
         self.log.info('Finished updating faculties')
 
-    def run(self):
+    def scrape(self):
         """
         Scraping thread that obtains updated course info
 
         :return:
         """
+        # Establish connection to LDAP server
+        server = Server('directory.srv.ualberta.ca', get_info=ALL)
+        conn = Connection(server, auto_bind=True)
 
-        if self.settings["scrape"]:
-            while True:
-                try:
-                    # Establish connection to LDAP server
-                    server = Server('directory.srv.ualberta.ca', get_info=ALL)
-                    conn = Connection(server, auto_bind=True)
+        # Updates faculties
+        self.updateFaculties(conn)
 
-                    # Updates faculties
-                    self.updateFaculties(conn)
+        # Get list of current terms
+        terms = self.getTerms()
 
-                    # Get list of current terms
-                    terms = self.getTerms()
+        # For each term, get the courses
+        for term in terms:
+            self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
+            self.scrapeCourseList(conn, term)
+            self.scrapeCourseDesc(conn, term)
 
-                    # For each term, get the courses
-                    for term in terms:
-                        self.log.info('Obtaining ' + terms[term] + ' course data with id ' + term)
-                        self.scrapeCourseList(conn, term)
-                        self.scrapeCourseDesc(conn, term)
-                    self.log.info('Finished scraping for UAlberta data')
-                    pass
-                except Exception as e:
-                    self.log.critical("There was an critical exception | " + str(e))
-
-                # Sleep for the specified interval
-                time.sleep(self.settings["scrapeinterval"])
-        else:
-            self.log.info("Scraping is disabled")
+        self.log.info('Finished scraping for UAlberta data')
 
 
 class UIDScraper(threading.Thread):

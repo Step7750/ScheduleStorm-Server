@@ -475,42 +475,29 @@ class UCalgary(University):
 
         self.updateTerms(termsdb)
 
-    def run(self):
+    def scrape(self):
         """
-        Scraping thread that obtains updated course info
+        Scraping function that obtains updated course info
 
         :return:
         """
+        # Update the faculties
+        self.updateFaculties()
 
-        if self.settings["scrape"]:
-            while True:
-                try:
-                    # Update the faculties
-                    self.updateFaculties()
+        # Login to U of C
+        if self.login():
+            # Get the terms
+            self.terms = self.scrapeTerms()
 
-                    # Login to U of C
-                    if self.login():
-                        # Get the terms
-                        self.terms = self.scrapeTerms()
+            if self.terms:
+                # update terms in the db
+                self.insertTerms(self.terms)
 
-                        if self.terms:
-                            # update terms in the db
-                            self.insertTerms(self.terms)
-
-                            # For each term, get the courses
-                            for term in self.terms:
-                                log.info("Obtaining " + str(term) + " course data with an id of "
-                                         + str(self.termNameToID(term)))
-                                self.getTermCourses(self.termNameToID(term))
-
-                except Exception as e:
-                    log.critical("CHECK EXCEPTION")
-                    traceback.print_exc()
-
-                # Sleep for the specified interval
-                time.sleep(self.settings["scrapeinterval"])
-        else:
-            log.info("Scraping is disabled")
+                # For each term, get the courses
+                for term in self.terms:
+                    log.info("Obtaining " + str(term) + " course data with an id of "
+                             + str(self.termNameToID(term)))
+                    self.getTermCourses(self.termNameToID(term))
 
 
 class CourseDescriptions(threading.Thread):
