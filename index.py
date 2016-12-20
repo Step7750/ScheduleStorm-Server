@@ -14,6 +14,7 @@ import time
 import logging
 import sys
 import falcon
+from threading import Lock
 from wsgiref import simple_server
 import hashlib
 
@@ -76,6 +77,9 @@ if __name__ == '__main__':
     unimemebers = inspect.getmembers(uni)
     rmpids = []
 
+    # lock for file synchronization
+    lock = Lock()
+
     log.info("Instantiating University Threads")
 
     # Foreach university in settings
@@ -84,8 +88,9 @@ if __name__ == '__main__':
         # Get the settings
         unisettings = settings["Universities"][university]
 
-        # Set the key
+        # Set the key and lock
         unisettings["uniID"] = university
+        unisettings["lock"] = lock
 
         # Only instantiate if they have it enabled in settings
         if "enabled" in unisettings and unisettings["enabled"]:

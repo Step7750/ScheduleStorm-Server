@@ -9,7 +9,9 @@ This file is a resource for Schedule Storm - https://github.com/Step7750/Schedul
 import threading
 import pymongo
 import logging
-from time import sleep
+import json
+from time import time, sleep
+from collections import OrderedDict
 from traceback import print_exc
 
 
@@ -514,23 +516,47 @@ class University(threading.Thread):
     def scrape(self):
         self.log.critical("You must override the scrape method!")
 
+    def updateLastScraped(self):
+        """
+        Updates the "lastScraped" property of this university in the settings file
+
+        :return:
+        """
+        with self.settings["lock"]:
+            with open("settings.json") as settingFile:
+                settings = json.load(settingFile, object_pairs_hook=OrderedDict)
+                settings["Universities"][self.settings["uniID"]]["lastUpdated"] = int(time())
+
+                with open('settings.json', 'wt') as out:
+                    json.dump(settings, out, indent=4)
+
     def run(self):
         if "scrapeinterval" not in self.settings or not isinstance(self.settings["scrapeinterval"], int) \
                 or self.settings["scrapeinterval"] < 0:
             self.log.critical("No 'scrapeinterval' set, aborting")
         else:
+            # check if we need to sleep given lastUpdated
+            if "lastUpdated" in self.settings:
+                # amount of seconds since the last successful update
+                lastUpdate = int(time()) - self.settings["lastUpdated"]
+
+                # if it was less than scrapeinterval, sleep for the amount of time
+                if 0 < lastUpdate < self.settings["scrapeinterval"]:
+                    self.log.info("Sleeping for " + str(self.settings["scrapeinterval"] - lastUpdate) + "s due to "
+                                                                                                        "lastUpdated")
+                    sleep(self.settings["scrapeinterval"] - lastUpdate)
+
             while True:
                 self.log.info("Starting to scrape updated course info")
-
                 self.isScraping = True
 
                 try:
                     self.scrape()
+                    self.updateLastScraped()
                 except Exception as e:
                     print_exc()
 
                 self.log.info("Done scraping, sleeping for " + str(self.settings["scrapeinterval"]) + "s")
-
                 self.isScraping = False
 
                 # Sleep for the specified interval

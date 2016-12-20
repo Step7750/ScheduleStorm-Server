@@ -75,6 +75,7 @@ Using the settings file, you can tell Schedule Storm your University's rmpid, ap
 | scrape    | bool   | No       | If true, starts the university thread to fetch updated course info
 | scrapeinterval | int | No     | Amount of seconds to sleep between subsequent scrapes
 | rmpid     | int    | Yes      | RMP ID of the University to fetch professor data from
+| lastUpdated | int  | Yes      | (Auto-generated) UNIX timestamp of the last successful scrape in seconds
 
 
 
