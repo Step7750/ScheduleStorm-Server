@@ -62,7 +62,7 @@ class v1GetAllUniTermSubjects():
         if uni in uniThreads and term in uniThreads[uni].getTerms():
             if uniThreads[uni].isScraping:
                 # we don't want to return data while scraping, send error (configure nginx to send stale data if it can)
-                resp.status = falcon.HTTP_400
+                resp.status = falcon.HTTP_500
                 resp.body = json.dumps(
                     {"error": "We're currently scraping this university, please check back in a couple minutes!"}
                 ).encode('utf-8')
