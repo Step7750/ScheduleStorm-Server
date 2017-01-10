@@ -311,12 +311,14 @@ class UAlberta(University):
                                                                paged_size=400,
                                                                generator=False)
 
+                subjectList = []
                 # For each entry in list updates the faculty
                 for entry in entry_list:
-                    if 'subject' in entry['attributes'] and entry['attributes']['faculty'] != "St Joseph's College":
+                    if 'subject' in entry['attributes'] and entry['attributes']['subject'] not in subjectList:
                         subjectDict = {'subject': entry['attributes']['subject'],
                                        'faculty': entry['attributes']['faculty'],
                                        'name': entry['attributes']['subjectTitle']}
+                        subjectList.append(subjectDict['subject'])
                         self.updateSubject(subjectDict)
         self.log.info('Finished updating faculties')
 
