@@ -33,9 +33,6 @@ class UCalgary(University):
         "Fall": 7
     }
 
-    # List of terms currently available on the site
-    terms = []
-
     def __init__(self, settings):
         # UCalgary doesn't have a public directory for course info, we have to login with a student account
         super().__init__(settings)
@@ -112,26 +109,34 @@ class UCalgary(University):
 
         return payload
 
-    def scrapeTerms(self):
+    def scrapeSearchTerms(self):
         """
         MUST BE LOGGED IN
 
-        Retrieves a list of available terms to retrieve class data for
+        Retrieves a list of available terms on the "Search classes" page to retrieve class data for
 
-        :return: **list** List of terms if the request was successful, False is not
+        :return:
         """
         r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
-                                  "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART"
-                                  "&Action=A&ExactKeys=Y&TargetFrameName=None",
-                                  verify=verifyRequests,
-                                  allow_redirects=False)
+                                  "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL?Page=SSR_CLSRCH_ENTRY"
+                                  "&Action=U&ExactKeys=Y&TargetFrameName=None",
+                                  verify=verifyRequests, allow_redirects=False)
 
         if r.status_code == requests.codes.ok:
-            termlist = self.parseTerms(r.text)
+            soup = BeautifulSoup(r.text, "lxml")
+
+            termlist = []
+            foundSelected = False
+
+            for term in soup.find("select", {"id": re.compile('CLASS_SRCH_WRK2_STRM\$\d+\$')}).findAll("option"):
+                if term.has_attr('selected'):
+                    foundSelected = True
+
+                if foundSelected:
+                    termlist.append(term.text.split(' - ')[1])
 
             return termlist
         else:
-            # We didn't receive the term list
             return False
 
     def parseTerms(self, text):
@@ -189,61 +194,68 @@ class UCalgary(University):
 
         return season + " " + year
 
-    def getTermCourses(self, termid):
+    def setSearchTerm(self, termid, payload):
+        payload['ICAction'] = 'CLASS_SRCH_WRK2_STRM$35$'
+        payload['DERIVED_SSTSNAV_SSTS_MAIN_GOTO$7$'] = 9999
+        payload['CLASS_SRCH_WRK2_INSTITUTION$31$'] = 'UCALG'
+        payload['CLASS_SRCH_WRK2_STRM$35$'] = termid
+        payload['SSR_CLSRCH_WRK_SUBJECT_SRCH$0'] = ""
+        payload['SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1'] = "C"
+        payload['SSR_CLSRCH_WRK_CATALOG_NBR$1'] = ""
+        payload['SSR_CLSRCH_WRK_ACAD_CAREER$2'] = ""
+        payload['SSR_CLSRCH_WRK_SSR_OPEN_ONLY$chk$3'] = "Y"
+        payload['SSR_CLSRCH_WRK_SSR_OPEN_ONLY$3'] = "Y"
+        payload['SSR_CLSRCH_WRK_OEE_IND$chk$4'] = "N"
+        payload['DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$'] = 9999
+
+        searchTerm = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                            "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
+                                            data=payload, verify=verifyRequests)
+
+        if searchTerm.status_code == requests.codes.ok:
+            return searchTerm.text
+        else:
+            return False
+
+    def getSearchTermCourses(self, termid):
         """
-        Gets the available courses for the specified term and calls to obtain the classes for each one
+        Gets the available courses for the specified term and calls to obtain the classes for each one in search
 
         :param termid: **string/int** Term ID to get courses for
         :return:
         """
         log.info("Getting courses for " + str(termid))
 
-        # Set the current term
-        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
-                                  "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART"
-                                  "&Action=A&ACAD_CAREER=UGRD&EMPLID=" + self.settings["ucid"] + "&INSTITUTION=UCALG&"
-                                  "STRM=" + termid +"&TargetFrameName=None", verify=verifyRequests)
+        searchPage = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                            "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL?Page=SSR_CLSRCH_ENTRY"
+                                            "&Action=U&ExactKeys=Y&TargetFrameName=None",
+                                            verify=verifyRequests, allow_redirects=False)
 
-        # We want the search course page now
-        payload = self.getHiddenInputPayload(r.text)
+        if searchPage.status_code != requests.codes.ok:
+            return
 
-        # Magic values
-        payload["ICAction"] = "DERIVED_REGFRM1_SSR_PB_SRCH"
-        payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$7$"] = 9999
-        payload["DERIVED_REGFRM1_CLASS_NBR"] = ""
-        payload["DERIVED_REGFRM1_SSR_CLS_SRCH_TYPE$249$"] = "06"
-        payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$"] = 9999
+        payload = self.getHiddenInputPayload(searchPage.text)
 
-        # Do the call
-        subjectlistpage = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
-                                                "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL", data=payload, verify=verifyRequests)
+        termPage = self.setSearchTerm(termid, payload)
 
+        if termPage is False:
+            return
 
-        subjectlist = []
-        # We now want the subject list for this term
-        soup = BeautifulSoup(subjectlistpage.text, "lxml")
+        # get subjects
+        subjects = []
+
+        soup = BeautifulSoup(termPage, "lxml")
 
         for subject in soup.find("select", {"id": "SSR_CLSRCH_WRK_SUBJECT_SRCH$0"}).findAll("option"):
             if subject["value"] != "":
                 # Don't want to include the first whitespace option
-                subjectlist.append(subject.text)
+                subjects.append(subject.text)
 
-        log.debug(str(subjectlist))
-
-        # Get the most recent payload
-        payload = self.getHiddenInputPayload(subjectlistpage.text)
-
-        for subject in subjectlist:
-            # obtain the courses for this subject
-            gotData = False
-
-            while not gotData:
-                try:
-                    self.getSubjectCourses(subject, termid, payload)
-                    gotData = True
-                except requests.exceptions.Timeout:
-                    log.error("Request timed out for " + subject)
-                    gotData = False
+        for subject in subjects:
+            try:
+                self.getSubjectCourses(subject, termid, payload)
+            except requests.exceptions.Timeout:
+                log.error("Request timed out for " + subject)
 
         log.info("Finished parsing the term courses for " + str(termid))
 
@@ -265,25 +277,25 @@ class UCalgary(University):
         # Specify the subject
         payload["SSR_CLSRCH_WRK_SUBJECT_SRCH$0"] = subjectid
 
+        # Specify the term
+        payload["CLASS_SRCH_WRK2_STRM$35$"] = termid
+
         # Get every class with a number greater than or equal to 0 (should get every class)
+        payload["CLASS_SRCH_WRK2_INSTITUTION$31$"] = "UCALG"
         payload["SSR_CLSRCH_WRK_SSR_EXACT_MATCH1$1"] = "G"
         payload["SSR_CLSRCH_WRK_CATALOG_NBR$1"] = 0
         payload["SSR_CLSRCH_WRK_ACAD_CAREER$2"] = ""
         payload["SSR_CLSRCH_WRK_SSR_OPEN_ONLY$chk$3"] = "N"
         payload["SSR_CLSRCH_WRK_OEE_IND$chk$4"] = "N"
-
-        log.info("Retrieving data for " + subjectid)
-
-        # Make the following an empty string if you want all locations
-        # Make it "MAIN" for only the u of c campus
-        payload["SSR_CLSRCH_WRK_LOCATION$15"] = ""
         payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$"] = 9999
         payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$7$"] = 9999
 
+        log.info("Retrieving data for " + subjectid)
+
         # Get the courselist
-        courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/"
-                                          "CAMPUS/c/SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL", data=payload,
-                                                     verify=verifyRequests, timeout=30)
+        courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                            "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
+                                            data=payload, verify=verifyRequests, timeout=30)
 
         if "search will return over 50 classes" in courselist.text:
             # Want to continue
@@ -291,9 +303,9 @@ class UCalgary(University):
             payload = self.getHiddenInputPayload(courselist.text)
             payload["ICAction"] = "#ICSave"
 
-            courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/"
-                                          "CAMPUS/c/SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL", data=payload, verify=verifyRequests,
-                                                timeout=40)
+            courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                                "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
+                                                data=payload, verify=verifyRequests, timeout=40)
 
 
 
@@ -305,18 +317,6 @@ class UCalgary(University):
         else:
             # We probably have the data we want
             self.parseRawCourseList(courselist.text, subjectid, termid)
-
-            # get the new search page again
-            payload = self.getHiddenInputPayload(courselist.text)
-
-            payload["ICAction"] = "CLASS_SRCH_WRK2_SSR_PB_NEW_SEARCH"
-            payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$7$"] = 9999
-            payload["DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$"] = 9999
-
-            self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/"
-                                    "CAMPUS/c/SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL",
-                                   data=payload, verify=verifyRequests, timeout=40)
-
 
     def parseRawCourseList(self, courselist, subjectid, termid):
         """
@@ -417,7 +417,6 @@ class UCalgary(University):
 
                 self.updateCourseDesc(classdesc)
 
-
     def updateFaculties(self):
         # Get the list
         log.info("Getting faculty list")
@@ -425,38 +424,40 @@ class UCalgary(University):
         # Get faculty list
         r = requests.get("http://www.ucalgary.ca/pubs/calendar/current/course-by-faculty.html")
 
-        if r.status_code == requests.codes.ok:
-            # Make BS obj
-            soup = BeautifulSoup(r.text, "lxml")
+        if r.status_code != requests.codes.ok:
+            log.error("Failed to retrieve faculty list")
+            return
 
-            # Iterate through each faculty
-            for faculty in soup.findAll("span", {"id": re.compile('ctl00_ctl00_pageContent_ctl\d*_ctl\d*_cnTitle')}):
-                log.debug(faculty.text)
+        soup = BeautifulSoup(r.text, "lxml")
 
-                # Get the faculty body
-                body = faculty.parent.find("span", {"id": re.compile('ctl00_ctl00_pageContent_ctl\d*_ctl\d*_cnBody')})
+        # Iterate through each faculty
+        for faculty in soup.findAll("span", {"id": re.compile('ctl00_ctl00_pageContent_ctl\d*_ctl\d*_cnTitle')}):
+            log.debug(faculty.text)
 
-                # Replace <br> with newlines
-                for br in body.find_all("br"):
-                    br.replace_with("\n")
+            # Get the faculty body
+            body = faculty.parent.find("span", {"id": re.compile('ctl00_ctl00_pageContent_ctl\d*_ctl\d*_cnBody')})
 
-                # Obtain each subject
-                subjects = body.find("p").text.split("\n")
+            # Replace <br> with newlines
+            for br in body.find_all("br"):
+                br.replace_with("\n")
 
-                for subject in subjects:
-                    # Strip the subject name
-                    subject = subject.strip()
-                    if len(subject) > 1 and " " in subject:
-                        subjectcode = subject.strip().split(" ")[-1]  # 3 or 4 letter subject code
+            # Obtain each subject
+            subjects = body.find("p").text.split("\n")
 
-                        # Make sure the code length is proper
-                        if len(subjectcode) > 1:
-                            subjectdict = {
-                                "subject": subjectcode,
-                                "faculty": faculty.text.strip()
-                            }
+            for subject in subjects:
+                # Strip the subject name
+                subject = subject.strip()
+                if len(subject) > 1 and " " in subject:
+                    subjectcode = subject.strip().split(" ")[-1]  # 3 or 4 letter subject code
 
-                            self.updateSubject(subjectdict)
+                    # Make sure the code length is proper
+                    if len(subjectcode) > 1:
+                        subjectdict = {
+                            "subject": subjectcode,
+                            "faculty": faculty.text.strip()
+                        }
+
+                        self.updateSubject(subjectdict)
 
         log.info("Updated faculty list")
 
@@ -484,20 +485,20 @@ class UCalgary(University):
         # Update the faculties
         self.updateFaculties()
 
-        # Login to U of C
-        if self.login():
-            # Get the terms
-            self.terms = self.scrapeTerms()
+        if not self.login():
+            return
 
-            if self.terms:
-                # update terms in the db
-                self.insertTerms(self.terms)
+        terms = self.scrapeSearchTerms()
 
-                # For each term, get the courses
-                for term in self.terms:
-                    log.info("Obtaining " + str(term) + " course data with an id of "
-                             + str(self.termNameToID(term)))
-                    self.getTermCourses(self.termNameToID(term))
+        if not terms:
+            return
+
+        self.insertTerms(terms)
+
+        for term in terms:
+            log.info("Obtaining " + str(term) + " course data with an id of " + str(self.termNameToID(term)))
+
+            self.getSearchTermCourses(self.termNameToID(term))
 
 
 class CourseDescriptions(threading.Thread):
@@ -665,7 +666,6 @@ class CourseDescriptions(threading.Thread):
                             coursedata[property] = data
                     else:
                         coursedata[property] = data
-
 
             coursedata["subject"] = self.subject
 
