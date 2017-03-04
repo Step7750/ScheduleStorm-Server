@@ -27,7 +27,7 @@ As you might expect, Schedule Storm is reliant upon class data for numerous univ
 
 #### Note: Requires MongoDB to be running
 
-Go through `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
+Rename `settings.example.json` to `settings.json` and set the `enabled` and `scrape` settings to true for every university you'd like to enable.
 
 The default port is 3000, you can change this in the settings file
 

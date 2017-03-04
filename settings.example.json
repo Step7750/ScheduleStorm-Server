@@ -9,7 +9,7 @@
             "enabled": false,
             "scrape": false,
             "rmpid": 1416,
-            "_comment": "UCalgary does not support multi-threading (on the same account), incorrect data will be retrieved"
+            "_comment": "UCalgary does not support multi-threading on the same account"
         },
         "UAlberta": {
             "fullname": "University of Alberta",
