@@ -278,10 +278,11 @@ class UAlberta(University):
             entry = conn.entries[len(conn.entries)-item]
             termDict = {"id": str(entry['term']), "name": str(entry['termTitle']).replace("Term ", "")}
 
-            # Adds term to term DB
-            self.updateTerm(termDict)
-
             terms.append(termDict)
+
+        # Adds term to term DB
+        self.updateTerms(terms)
+
         # Returns current terms
         return terms
 
