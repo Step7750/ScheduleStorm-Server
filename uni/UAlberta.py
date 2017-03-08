@@ -128,6 +128,7 @@ class UAlberta(University):
                 courseDesc['desc'] = desc
 
             # Upserts course description
+
             self.updateCourseDesc(courseDesc)
 
     def UidToName(self, uid):
@@ -297,30 +298,29 @@ class UAlberta(University):
 
         # Gets all recent terms and cycles through them
         for term in self.scrapeTerms(conn):
-            # If the term is a continue education term or main term update faculties
-            if int(term['id']) % 3 == 0 or int(term['id']) % 10 == 0:
 
-                # Sets the search base for the query
-                searchBase = 'term='+term['id']+', ou=calendar, dc=ualberta, dc=ca'
-                self.log.info("Updating faculties with search base " + searchBase)
+            # Sets the search base for the query
+            searchBase = 'term='+term['id']+', ou=calendar, dc=ualberta, dc=ca'
+            self.log.info("Updating faculties with search base " + searchBase)
 
-                # Page queries all faculties in current term
-                entry_list = conn.extend.standard.paged_search(search_base=searchBase,
-                                                               search_filter='(term=*)',
-                                                               search_scope=LEVEL,
-                                                               attributes=['subject', 'subjectTitle', 'faculty'],
-                                                               paged_size=400,
-                                                               generator=False)
+            # Page queries all faculties in current term
+            entry_list = conn.extend.standard.paged_search(search_base=searchBase,
+                                                           search_filter='(term=*)',
+                                                           search_scope=LEVEL,
+                                                           attributes=['subject', 'subjectTitle', 'faculty'],
+                                                           paged_size=400,
+                                                           generator=False)
 
-                subjectList = []
-                # For each entry in list updates the faculty
-                for entry in entry_list:
-                    if 'subject' in entry['attributes'] and entry['attributes']['subject'] not in subjectList:
-                        subjectDict = {'subject': entry['attributes']['subject'],
-                                       'faculty': entry['attributes']['faculty'],
-                                       'name': entry['attributes']['subjectTitle']}
-                        subjectList.append(subjectDict['subject'])
-                        self.updateSubject(subjectDict)
+            subjectList = []
+            # For each entry in list updates the faculty
+            for entry in entry_list:
+                if 'subject' in entry['attributes'] and entry['attributes']['subject'] not in subjectList:
+                    subjectDict = {'subject': entry['attributes']['subject'],
+                                   'faculty': entry['attributes']['faculty'],
+                                   'name': entry['attributes']['subjectTitle']}
+                    subjectList.append(subjectDict['subject'])
+
+                    self.updateSubject(subjectDict)
         self.log.info('Finished updating faculties')
 
     def scrape(self):
