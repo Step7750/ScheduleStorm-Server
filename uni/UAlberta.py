@@ -274,8 +274,8 @@ class UAlberta(University):
                     attributes=['term', 'termTitle'])
         terms = []
 
-        # Gets the four most recent terms
-        for item in range(1, 5):
+        # Gets the seven most recent terms
+        for item in range(1, 7):
             entry = conn.entries[len(conn.entries)-item]
             termDict = {"id": str(entry['term']), "name": str(entry['termTitle']).replace("Term ", "")}
 
@@ -307,20 +307,22 @@ class UAlberta(University):
             entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                            search_filter='(term=*)',
                                                            search_scope=LEVEL,
-                                                           attributes=['subject', 'subjectTitle', 'faculty'],
+                                                           attributes=['subject', 'subjectTitle', 'faculty', 'career'],
                                                            paged_size=400,
                                                            generator=False)
 
-            subjectList = []
+            ugrad = []
             # For each entry in list updates the faculty
             for entry in entry_list:
-                if 'subject' in entry['attributes'] and entry['attributes']['subject'] not in subjectList:
+                if 'subject' in entry['attributes']:
                     subjectDict = {'subject': entry['attributes']['subject'],
                                    'faculty': entry['attributes']['faculty'],
                                    'name': entry['attributes']['subjectTitle']}
-                    subjectList.append(subjectDict['subject'])
-
-                    self.updateSubject(subjectDict)
+                    if entry['attributes']['career'] == 'UGRD':
+                        ugrad.append(subjectDict['subject'])
+                        self.updateSubject(subjectDict)
+                    elif entry['attributes']['career'] == 'GRAD' and subjectDict['subject'] not in ugrad:
+                        self.updateSubject(subjectDict)
         self.log.info('Finished updating faculties')
 
     def scrape(self):
