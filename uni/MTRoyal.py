@@ -194,6 +194,8 @@ class MTRoyal(University):
                    "&sel_attr=dummy" \
                    "&sel_crse=" \
                    "&sel_title=" \
+                   "&sel_schd=%" \
+                   "&sel_attr=%" \
                    "&begin_hh=0" \
                    "&begin_mi=0" \
                    "&begin_ap=a" \
