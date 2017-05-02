@@ -115,7 +115,7 @@ class UCalgary(University):
 
         Retrieves a list of available terms on the "Search classes" page to retrieve class data for
 
-        :return:
+        :return: **list** List of terms if the request was successful, False is not
         """
         r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
                                   "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL?Page=SSR_CLSRCH_ENTRY"
@@ -136,6 +136,25 @@ class UCalgary(University):
                     termlist.append(term.text.split(' - ')[1])
 
             return termlist
+        else:
+            return False
+
+    def scrapeTerms(self):
+        """
+        MUST BE LOGGED IN
+
+        Retrieves a list of available terms to retrieve class data for on the "enrollment" page
+
+        :return: **list** List of terms if the request was successful, False is not
+        """
+        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+                                  "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART"
+                                  "&Action=A&ExactKeys=Y&TargetFrameName=None",
+                                  verify=verifyRequests,
+                                  allow_redirects=False)
+
+        if r.status_code == requests.codes.ok:
+            return self.parseTerms(r.text)
         else:
             return False
 
@@ -488,7 +507,7 @@ class UCalgary(University):
         if not self.login():
             return
 
-        terms = self.scrapeSearchTerms()
+        terms = self.scrapeTerms()
 
         if not terms:
             return
