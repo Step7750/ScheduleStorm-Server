@@ -307,7 +307,8 @@ class UAlberta(University):
             entry_list = conn.extend.standard.paged_search(search_base=searchBase,
                                                            search_filter='(term=*)',
                                                            search_scope=LEVEL,
-                                                           attributes=['subject', 'subjectTitle', 'faculty', 'career'],
+                                                           attributes=['subject', 'subjectTitle', 'faculty', 'career',
+                                                                       'courseTitle'],
                                                            paged_size=400,
                                                            generator=False)
 
@@ -317,7 +318,11 @@ class UAlberta(University):
                 if 'subject' in entry['attributes']:
                     subjectDict = {'subject': entry['attributes']['subject'],
                                    'faculty': entry['attributes']['faculty'],
-                                   'name': entry['attributes']['subjectTitle']}
+                                   'name': None}
+                    if 'subjectTitle' in entry['attributes']:
+                        subjectDict['name'] = entry['attributes']['subjectTitle']
+                    else:
+                       subjectDict['name'] = entry['attributes']['courseTitle']
                     if entry['attributes']['career'] == 'UGRD':
                         ugrad.append(subjectDict['subject'])
                         self.updateSubject(subjectDict)
