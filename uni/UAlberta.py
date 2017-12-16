@@ -33,7 +33,7 @@ class UAlberta(University):
         :return: **string**
         """
         char = 1
-        while not req[char].isalpha():
+        while char < len(req) and not req[char].isalpha():
                         char += 1
         return req[char:]
 
@@ -58,7 +58,6 @@ class UAlberta(University):
 
         # for entry in list, parse and upsert course descriptions
         for entry in entry_list:
-
             # initialize course description dict
             courseDesc = {
                 'coursenum': entry['attributes']['catalog'],
@@ -383,15 +382,14 @@ class UIDScraper(threading.Thread):
                 if uidExists.count() == 0:
                     try:
                         # Get the prof data from the UAlberta directory
-                        r = requests.get("http://webapps.srv.ualberta.ca/search/?type=simple&uid=true&c=" + thisuid,
-                                        timeout=20)
+                        r = requests.get("http://directory.ualberta.ca/person/" + thisuid, timeout=20)
 
                         # Check if the HTTP status code is ok
                         if r.status_code == requests.codes.ok:
                             # Parse the HTML
                             soup = BeautifulSoup(r.text, "lxml")
-                            for tag in soup.find_all("b"):
-                                info = tag.text
+                            for tag in soup.find_all("h2", {"class": "p-0 m-0"}):
+                                info = " ".join(tag.text.split())
                                 if info != "Dr " and info != "Prof ":
                                     professor = info
                                     break
