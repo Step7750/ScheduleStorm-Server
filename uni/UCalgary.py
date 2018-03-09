@@ -57,7 +57,7 @@ class UCalgary(University):
                    "Login": "Sign+In"}
 
         r = self.loginSession.post("https://cas.ucalgary.ca/cas/login?service="
-                                   "https://my.ucalgary.ca/psp/paprd/?cmd=start&ca.ucalgary.authent.ucid=true",
+                                   "https://portal.my.ucalgary.ca/psp/paprd/?cmd=start&ca.ucalgary.authent.ucid=true",
                                    data=payload,
                                    verify=verifyRequests)
 
@@ -68,7 +68,7 @@ class UCalgary(University):
             payload = self.getHiddenInputPayload(r.text)
 
 
-            r = self.loginSession.post("https://my.ucalgary.ca/psp/paprd/?cmd=start", data=payload, verify=verifyRequests)
+            r = self.loginSession.post("https://portal.my.ucalgary.ca/psp/paprd/?cmd=start", data=payload, verify=verifyRequests)
 
             if "My class schedule" in r.text:
                 # We probably logged in, it's hard to tell without HTTP status codes
@@ -117,7 +117,7 @@ class UCalgary(University):
 
         :return: **list** List of terms if the request was successful, False is not
         """
-        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+        r = self.loginSession.get("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                   "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL?Page=SSR_CLSRCH_ENTRY"
                                   "&Action=U&ExactKeys=Y&TargetFrameName=None",
                                   verify=verifyRequests, allow_redirects=False)
@@ -147,7 +147,7 @@ class UCalgary(University):
 
         :return: **list** List of terms if the request was successful, False is not
         """
-        r = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+        r = self.loginSession.get("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                   "SA_LEARNER_SERVICES.SSR_SSENRL_CART.GBL?Page=SSR_SSENRL_CART"
                                   "&Action=A&ExactKeys=Y&TargetFrameName=None",
                                   verify=verifyRequests,
@@ -227,7 +227,7 @@ class UCalgary(University):
         payload['SSR_CLSRCH_WRK_OEE_IND$chk$4'] = "N"
         payload['DERIVED_SSTSNAV_SSTS_MAIN_GOTO$8$'] = 9999
 
-        searchTerm = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+        searchTerm = self.loginSession.post("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                             "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
                                             data=payload, verify=verifyRequests)
 
@@ -245,7 +245,7 @@ class UCalgary(University):
         """
         log.info("Getting courses for " + str(termid))
 
-        searchPage = self.loginSession.get("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+        searchPage = self.loginSession.get("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                             "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL?Page=SSR_CLSRCH_ENTRY"
                                             "&Action=U&ExactKeys=Y&TargetFrameName=None",
                                             verify=verifyRequests, allow_redirects=False)
@@ -312,7 +312,7 @@ class UCalgary(University):
         log.info("Retrieving data for " + subjectid)
 
         # Get the courselist
-        courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+        courselist = self.loginSession.post("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                             "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
                                             data=payload, verify=verifyRequests, timeout=30)
 
@@ -322,7 +322,7 @@ class UCalgary(University):
             payload = self.getHiddenInputPayload(courselist.text)
             payload["ICAction"] = "#ICSave"
 
-            courselist = self.loginSession.post("https://csprd.ucalgary.ca/psc/csprd/EMPLOYEE/CAMPUS/c/"
+            courselist = self.loginSession.post("https://csprd.my.ucalgary.ca/psc/csprd/EMPLOYEE/SA/c/"
                                                 "SA_LEARNER_SERVICES.CLASS_SEARCH.GBL",
                                                 data=payload, verify=verifyRequests, timeout=40)
 
@@ -505,6 +505,7 @@ class UCalgary(University):
         self.updateFaculties()
 
         if not self.login():
+            log.error("Failed to login")
             return
 
         terms = self.scrapeTerms()
