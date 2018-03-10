@@ -209,7 +209,7 @@ class UAlberta(University):
             info = str(entry['attributes']['asString']).split(" ")
 
             # Seperates the subject from the coursenum
-            if not info[1].isdigit():
+            if not re.search(r'\d', info[1]):
                 subject = info[0] + " " + info[1]
                 coursenum = info[2]
             else:
@@ -223,6 +223,8 @@ class UAlberta(University):
                 status = "Closed"
             else:
                 status = entry['attributes']['enrollStatus']
+
+
 
             # Initializes upsert dict
             courseList = {"subject": subject, "term": entry['attributes']['term'][0], "coursenum": coursenum,
@@ -239,8 +241,9 @@ class UAlberta(University):
 
             # for entry in list, match the days, startTime, endTime, and locations to course
             for entry_times in times_list:
-                
+
                 if entry_times['attributes']['class'] == courseList['id']:
+
                     # Combines day, startTime, endTime into a duration
                     duration = " "
                     duration = duration.join(
@@ -252,9 +255,11 @@ class UAlberta(University):
                     courseList['times'] = [duration]
 
                     # Does the class have an assigned classroom
-                    if 'location' in entry['attributes']:
-                        courseList['rooms'] = [entry['attributes']['location']]
+                    if 'location' in entry_times['attributes']:
+                        courseList['rooms'] = [entry_times['attributes']['location']]
                     times_list.remove(entry_times)
+
+
             # Upserts course into db
             self.updateClass(courseList)
 
