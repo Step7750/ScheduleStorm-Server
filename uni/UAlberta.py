@@ -239,26 +239,28 @@ class UAlberta(University):
             else:
                 courseList['teachers'] = ["N/A"]
 
-            # for entry in list, match the days, startTime, endTime, and locations to course
-            for entry_times in times_list:
+            # Get a list of times and locations associated with a course
+            times = [x for x in times_list if x['attributes']['class'] == courseList['id']]
 
-                if entry_times['attributes']['class'] == courseList['id']:
+            for entry_time in times:
 
-                    # Combines day, startTime, endTime into a duration
-                    duration = " "
-                    duration = duration.join(
-                        (entry_times['attributes']['day'][0], entry_times['attributes']['startTime'][0].replace(" ", ""),
-                         entry_times['attributes']['endTime'][0].replace(" ", "")))
+                times_list.remove(entry_time)
 
-                    # Adds '-' btw the times
-                    duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
-                    courseList['times'] = [duration]
+                # Combines day, startTime, endTime into a duration
+                duration = " "
+                duration = duration.join(
+                    (entry_time['attributes']['day'][0], entry_time['attributes']['startTime'][0].replace(" ", ""),
+                     entry_time['attributes']['endTime'][0].replace(" ", "")))
 
-                    # Does the class have an assigned classroom
-                    if 'location' in entry_times['attributes']:
-                        courseList['rooms'] = [entry_times['attributes']['location']]
-                    times_list.remove(entry_times)
+                # Adds '-' btw the times
+                duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
+                if "N/A" == courseList['times'][0]:
+                    courseList['times'].pop(0)
+                courseList['times'].append(duration)
 
+                # Does the class have an assigned classroom
+                if 'location' in entry['attributes']:
+                    courseList['rooms'] = [entry['attributes']['location']]
 
             # Upserts course into db
             self.updateClass(courseList)
