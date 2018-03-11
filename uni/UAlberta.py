@@ -239,26 +239,27 @@ class UAlberta(University):
             else:
                 courseList['teachers'] = ["N/A"]
 
-            # for entry in list, match the days, startTime, endTime, and locations to course
-            for entry_times in times_list:
+            # Get a list of times and locations associated with a course
+            times = [x for x in times_list if x['attributes']['class'] == courseList['id']]
 
-                if entry_times['attributes']['class'] == courseList['id']:
+            for entry_time in times:
+                times_list.remove(entry_time)
+                attributes = entry_time['attributes']
 
-                    # Combines day, startTime, endTime into a duration
-                    duration = " "
-                    duration = duration.join(
-                        (entry_times['attributes']['day'][0], entry_times['attributes']['startTime'][0].replace(" ", ""),
-                         entry_times['attributes']['endTime'][0].replace(" ", "")))
+                # Combines day, startTime, endTime into a duration
+                duration = " ".join(
+                    (attributes['day'][0], attributes['startTime'][0].replace(" ", ""),
+                     attributes['endTime'][0].replace(" ", "")))
 
-                    # Adds '-' btw the times
-                    duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
-                    courseList['times'] = [duration]
+                # Adds '-' btw the times
+                duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
+                if "N/A" == courseList['times'][0]:
+                    courseList['times'].pop(0)
+                courseList['times'].append(duration)
 
-                    # Does the class have an assigned classroom
-                    if 'location' in entry_times['attributes']:
-                        courseList['rooms'] = [entry_times['attributes']['location']]
-                    times_list.remove(entry_times)
-
+                # Does the class have an assigned classroom
+                if 'location' in attributes:
+                    courseList['rooms'] = [attributes['location']]
 
             # Upserts course into db
             self.updateClass(courseList)
