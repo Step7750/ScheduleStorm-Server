@@ -243,14 +243,13 @@ class UAlberta(University):
             times = [x for x in times_list if x['attributes']['class'] == courseList['id']]
 
             for entry_time in times:
-
                 times_list.remove(entry_time)
+                attributes = entry_time['attributes']
 
                 # Combines day, startTime, endTime into a duration
-                duration = " "
-                duration = duration.join(
-                    (entry_time['attributes']['day'][0], entry_time['attributes']['startTime'][0].replace(" ", ""),
-                     entry_time['attributes']['endTime'][0].replace(" ", "")))
+                duration = " ".join(
+                    (attributes['day'][0], attributes['startTime'][0].replace(" ", ""),
+                     attributes['endTime'][0].replace(" ", "")))
 
                 # Adds '-' btw the times
                 duration = re.sub(r'^((.*?\s.*?){1})\s', r'\1 - ', duration)
@@ -259,8 +258,8 @@ class UAlberta(University):
                 courseList['times'].append(duration)
 
                 # Does the class have an assigned classroom
-                if 'location' in entry['attributes']:
-                    courseList['rooms'] = [entry['attributes']['location']]
+                if 'location' in attributes:
+                    courseList['rooms'] = [attributes['location']]
 
             # Upserts course into db
             self.updateClass(courseList)
