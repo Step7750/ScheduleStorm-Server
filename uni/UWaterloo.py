@@ -127,18 +127,34 @@ class UWaterloo(University):
 
                 if course['catalog_number'] != prevClass or prevClass == '':
                     group = []
-                    # initialize course dictionary
-                courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'],
-                              'term': term,
-                              'id': course['class_number'], 'type': course['section'][:3], 'group': [],
-                              'location': course['campus'], 'curEnroll': course['enrollment_capacity'],
-                              'rooms': [course['classes'][0]['location']['building'], course['classes'][0]['location']['room']],
-                              'capEnroll': course['enrollment_total'], 'capwaitEnroll': course['waiting_capacity'],
-                              'section': course['section'][4:], 'times': ['N/A']}
 
+                # initialize course dictionary
+                courseDict = {'coursenum': course['catalog_number'],
+                              'subject': subject['subject'],
+                              'term': term,
+                              'id': course['class_number'],
+                              'type': course['section'][:3],
+                              'group': [],
+                              'location': course['campus'],
+                              'curEnroll': course['enrollment_capacity'],
+                              'capEnroll': course['enrollment_total'],
+                              'capwaitEnroll': course['waiting_capacity'],
+                              'section': course['section'][4:],
+                              'rooms': ['N/A'],
+                              'times': ['N/A']}
 
                 # For each class initialize course dictionary to be upserted
                 for date in course['classes']:
+
+                    # If location and building exists in the course info append to rooms
+                    if 'location' in date and date['location']['building']:
+                        if courseDict['rooms'][0] == 'N/A':
+                            courseDict['rooms'].pop()
+
+                        if 'room' in date['location']:
+                            courseDict['rooms'].append(date['location']['building'] + " " + date['location']['room'])
+                        else:
+                            courseDict['rooms'].append(date['location']['building'])
 
                     # Checks if class is open, closed, or has a waiting list
                     if course['enrollment_capacity'] != 0 and course['enrollment_total']/course['enrollment_capacity'] >= 1:
@@ -151,6 +167,9 @@ class UWaterloo(University):
                             courseDict['status'] = 'Closed'
                     else:
                         courseDict['status'] = 'Open'
+
+                    if courseDict['subject'] == 'MATH' and courseDict['coursenum'] == '117':
+                        print(date)
 
                     # Checks to see if class has a start and end time
                     if date['date']['start_time']:
