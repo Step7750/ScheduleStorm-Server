@@ -168,9 +168,6 @@ class UWaterloo(University):
                     else:
                         courseDict['status'] = 'Open'
 
-                    if courseDict['subject'] == 'MATH' and courseDict['coursenum'] == '117':
-                        print(date)
-
                     # Checks to see if class has a start and end time
                     if date['date']['start_time']:
                         if courseDict['times'][0] == 'N/A':
