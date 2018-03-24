@@ -31,7 +31,6 @@ class UWaterlooAPI:
         """
 
         r = requests.get(self.baseURL + path + self.format + self.api_key, timeout=20)
-
         # Checks id request was successful and returns info to be parsed
         if r.status_code == requests.codes.ok:
             return json.loads(r.text)['data']
@@ -123,22 +122,39 @@ class UWaterloo(University):
         courseList = []
         # For each subject scrape courses
         for subject in subjectList:
-
             # Gets all courses based on term and subject
             for course in uw.term_subject_schedule(term, subject['subject']):
 
                 if course['catalog_number'] != prevClass or prevClass == '':
                     group = []
+
+                # initialize course dictionary
+                courseDict = {'coursenum': course['catalog_number'],
+                              'subject': subject['subject'],
+                              'term': term,
+                              'id': course['class_number'],
+                              'type': course['section'][:3],
+                              'group': [],
+                              'location': course['campus'],
+                              'curEnroll': course['enrollment_capacity'],
+                              'capEnroll': course['enrollment_total'],
+                              'capwaitEnroll': course['waiting_capacity'],
+                              'section': course['section'][4:],
+                              'rooms': ['N/A'],
+                              'times': ['N/A']}
+
                 # For each class initialize course dictionary to be upserted
                 for date in course['classes']:
 
-                    # initialize course dictionary
-                    courseDict = {'coursenum': course['catalog_number'], 'subject': subject['subject'], 'term': term,
-                                  'id': course['class_number'], 'type': course['section'][:3], 'group': [],
-                                  'location': course['campus'], 'curEnroll': course['enrollment_capacity'],
-                                  'rooms': [date['location']['building'], date['location']['room']],
-                                  'capEnroll': course['enrollment_total'], 'capwaitEnroll': course['waiting_capacity'],
-                                  'section': course['section'][4:]}
+                    # If location and building exists in the course info append to rooms
+                    if 'location' in date and date['location']['building']:
+                        if courseDict['rooms'][0] == 'N/A':
+                            courseDict['rooms'].pop()
+
+                        if 'room' in date['location']:
+                            courseDict['rooms'].append(date['location']['building'] + " " + date['location']['room'])
+                        else:
+                            courseDict['rooms'].append(date['location']['building'])
 
                     # Checks if class is open, closed, or has a waiting list
                     if course['enrollment_capacity'] != 0 and course['enrollment_total']/course['enrollment_capacity'] >= 1:
@@ -154,12 +170,13 @@ class UWaterloo(University):
 
                     # Checks to see if class has a start and end time
                     if date['date']['start_time']:
+                        if courseDict['times'][0] == 'N/A':
+                            courseDict['times'].pop()
                         course_start_time = datetime.strptime(date['date']['start_time'], '%H:%M')
                         course_end_time = datetime.strptime(date['date']['end_time'], '%H:%M')
-                        courseDict['times'] = [date['date']['weekdays'] + " " + course_start_time.strftime('%I:%M%p') +
-                                               ' - ' + course_end_time.strftime('%I:%M%p')]
-                    else:
-                        courseDict['times'] = ['N/A']
+                        courseDict['times'].append(date['date']['weekdays'] + " " +
+                                                   course_start_time.strftime('%I:%M%p') + ' - ' +
+                                                   course_end_time.strftime('%I:%M%p'))
 
                     # Checks for assigned teacher
                     if date['instructors']:
